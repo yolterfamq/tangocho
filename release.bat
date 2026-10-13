@@ -26,9 +26,19 @@ powershell -NoProfile -Command "(Get-Content Tangocho.csproj -Raw -Encoding UTF8
 
 git add -A
 git commit -m "Версия %VER%" || echo Нет новых изменений, ставлю только тег.
+git push -u origin HEAD
+if errorlevel 1 (
+  echo.
+  echo Не получилось отправить код на GitHub. Тег не поставлен.
+  echo Если на GitHub есть изменения, которых нет у тебя, сначала выполни:  git pull --rebase
+  exit /b 1
+)
 git tag -a "v%VER%" -m "%NOTES%"
-git push
 git push origin "v%VER%"
+if errorlevel 1 (
+  echo Не получилось отправить тег v%VER%.
+  exit /b 1
+)
 
 echo.
 echo Готово! Сборка идёт тут: Actions в твоём репозитории на GitHub.
