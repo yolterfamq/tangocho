@@ -3,3 +3,14 @@ obj/
 out/
 .vs/
 *.user
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+
+# Ключи подписи НИКОГДА не коммитить
+*.jks
+*.keystore
+ANDROID_KEYSTORE_*.txt

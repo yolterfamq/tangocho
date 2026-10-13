@@ -237,7 +237,7 @@ body{margin:0;user-select:none;-webkit-user-select:none}
     </div>
     <div class="field">
       <span class="lbl">Прогресс</span>
-      <span class="hint">Прогресс хранится на этом компьютере и сохраняется при обновлениях.</span>
+      <span class="hint">Прогресс хранится на этом устройстве и сохраняется при обновлениях.</span>
       <button class="danger" id="resetBtn">Сбросить прогресс</button>
       <div class="confirm" id="resetConfirm" hidden>
         <span>Удалить весь прогресс?</span>
@@ -503,10 +503,14 @@ document.addEventListener("keydown", e => {
 });
 
 // ───────── связь с программой (обновления) ─────────
-const wv = window.chrome && window.chrome.webview;
-function hostSend(m){ try { wv && wv.postMessage(m); } catch(e) {} }
+const wv = window.chrome && window.chrome.webview;      // ПК (WebView2)
+const an = window.TangochoAndroid;                       // Android
+const isApp = !!(wv || an);
+function hostSend(m){
+  try { if (wv) wv.postMessage(m); else if (an) an.postMessage(JSON.stringify(m)); } catch(e) {}
+}
 
-const U = { version:"", enabled:false, state:"idle", newVer:"", progress:0, message:"", notes:"", bannerHidden:false };
+const U = { platform:"pc", version:"", enabled:false, state:"idle", newVer:"", progress:0, message:"", notes:"", bannerHidden:false };
 
 function renderUpdates(){
   $("updVer").textContent = "Установлена версия " + U.version;
@@ -524,9 +528,15 @@ function renderUpdates(){
       st.textContent = "Скачиваю версию " + U.newVer + "… " + Math.round(U.progress*100) + "%";
       $("updProg").hidden = false; $("updBar").style.width = (U.progress*100) + "%"; chk.disabled = true; break;
     case "ready":
-      st.textContent = "Версия " + U.newVer + " скачана. Она установится при следующем запуске, или перезапусти сейчас.";
+      st.textContent = U.platform === "android"
+        ? "Версия " + U.newVer + " скачана. Нажми «Установить», телефон спросит подтверждение."
+        : "Версия " + U.newVer + " скачана. Она установится при следующем запуске, или перезапусти сейчас.";
       st.classList.add("ok"); $("updNotes").textContent = U.notes || "";
-      act.textContent = "Перезапустить и обновить"; act.dataset.do = "install"; act.hidden = false; break;
+      act.textContent = U.platform === "android" ? "Установить" : "Перезапустить и обновить";
+      act.dataset.do = "install"; act.hidden = false; break;
+    case "permission":
+      st.textContent = U.message;
+      act.textContent = "Установить"; act.dataset.do = "install"; act.hidden = false; break;
     case "error": st.textContent = U.message; st.classList.add("err"); break;
     default: st.textContent = "";
   }
@@ -534,17 +544,17 @@ function renderUpdates(){
   const b = $("banner"), go = $("bannerGo");
   if (U.state === "ready" && !U.bannerHidden) {
     $("bannerText").textContent = "Обновление " + U.newVer + " готово";
-    go.textContent = "Перезапустить"; go.dataset.do = "install"; go.hidden = false; b.hidden = false;
+    go.textContent = U.platform === "android" ? "Установить" : "Перезапустить"; go.dataset.do = "install"; go.hidden = false; b.hidden = false;
   } else if (U.justUpdated && !U.bannerHidden) {
     $("bannerText").textContent = "Тангочо обновлён до версии " + U.version;
     go.hidden = true; b.hidden = false;
   } else b.hidden = true;
 }
 
-if (wv) {
-  wv.addEventListener("message", e => {
-    const m = e.data || {};
+function onHost(m){
+    m = m || {};
     if (m.type === "info") {
+      if (m.platform) U.platform = m.platform;
       U.version = m.version; U.enabled = m.enabled; U.justUpdated = !!m.justUpdated;
       $("updAuto").checked = !!m.auto; $("updAuto").disabled = !m.enabled;
       $("updField").hidden = false;
@@ -558,7 +568,13 @@ if (wv) {
       if (m.state === "ready") U.bannerHidden = false;
     }
     renderUpdates();
-  });
+}
+window.__host = onHost;
+// Кнопка «Назад» на Android: сначала закрываем список/настройки
+window.__hostBack = () => { if (view !== "study") { show("study"); return true; } return false; };
+
+if (isApp) {
+  if (wv) wv.addEventListener("message", e => onHost(e.data));
   $("updCheck").onclick = () => hostSend({ type:"check" });
   $("updAction").onclick = e => hostSend({ type: e.currentTarget.dataset.do });
   $("bannerGo").onclick = e => hostSend({ type: e.currentTarget.dataset.do });

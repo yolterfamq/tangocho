@@ -1,0 +1,59 @@
+plugins {
+    id "com.android.application"
+}
+
+// Версию и репозиторий подставляет GitHub Actions: -PappVersion=1.0.1 -PupdateRepo=owner/repo
+def appVersion = (project.findProperty("appVersion") ?: "1.0.0").toString()
+def updateRepo = (project.findProperty("updateRepo") ?: "").toString()
+def parts = (appVersion.tokenize(".") + ["0", "0", "0"]).take(3).collect { it.replaceAll("\\D", "") ?: "0" }*.toInteger()
+def code = parts[0] * 10000 + parts[1] * 100 + parts[2]
+
+android {
+    namespace "com.yolterfamq.tangocho"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.yolterfamq.tangocho"
+        minSdk 24
+        targetSdk 34
+        versionCode code
+        versionName appVersion
+        buildConfigField "String", "UPDATE_REPO", "\"${updateRepo}\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    signingConfigs {
+        release {
+            def ks = System.getenv("KEYSTORE_PATH")
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias "tangocho"
+                keyPassword System.getenv("KEYSTORE_PASSWORD")
+                storeType "PKCS12"
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    // Карточки берутся из общей папки web/ в корне репозитория — те же, что в ПК-версии
+    sourceSets {
+        main {
+            assets.srcDirs = ["src/main/assets", "../../web"]
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

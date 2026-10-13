@@ -3,3 +3,5 @@
 *.xaml text eol=crlf
 *.csproj text eol=crlf
 *.ico binary
+*.png binary
+*.jar binary
