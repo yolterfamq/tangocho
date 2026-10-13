@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <AssemblyName>Tangocho</AssemblyName>
+    <RootNamespace>Tangocho</RootNamespace>
+    <Product>Тангочо</Product>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+
+    <!-- Версию при релизе подставляет GitHub Actions из тега (v1.0.1 → 1.0.1) -->
+    <Version>1.0.0</Version>
+
+    <!-- Репозиторий для обновлений (owner/repo). GitHub Actions подставляет его сам -->
+    <UpdateRepo></UpdateRepo>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>UpdateRepo</_Parameter1>
+      <_Parameter2>$(UpdateRepo)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="web\index.html" LogicalName="web.index.html" />
+    <Resource Include="icon.ico" />
+  </ItemGroup>
+
+</Project>

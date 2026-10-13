@@ -1,0 +1,5 @@
+*.bat text eol=crlf
+*.cs text eol=crlf
+*.xaml text eol=crlf
+*.csproj text eol=crlf
+*.ico binary

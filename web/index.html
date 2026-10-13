@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Тангочо · Урок 4</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&family=Onest:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-screen study app, like Anki on a phone — counters on top, card in the middle, grade bar fixed at the bottom */
+:root{
+  --bg:#f2f3f6; --surface:#ffffff; --fg:#171a21; --muted:#676d7c; --line:#dcdfe7; --accent:#33508f;
+  --again:#c4433b; --hard:#555b6b; --good:#2b8549; --easy:#2c6bc4;
+  --jp:"Klee One","Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+  --ui:"Onest",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0c0e12; --surface:#15181f; --fg:#e8eaf0; --muted:#8b91a1; --line:#252a34; --accent:#9db1ea;
+    --again:#ef6a61; --hard:#b0b5c2; --good:#5fc27d; --easy:#6ea6f5; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0c0e12; --surface:#15181f; --fg:#e8eaf0; --muted:#8b91a1; --line:#252a34; --accent:#9db1ea;
+  --again:#ef6a61; --hard:#b0b5c2; --good:#5fc27d; --easy:#6ea6f5; color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--ui);font-size:16px;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+
+.app{height:100%;max-width:720px;margin:0 auto;padding-inline:16px;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;gap:8px;padding-block:14px 6px}
+.brand{display:flex;align-items:baseline;gap:10px;flex:1;min-width:0}
+.brand b{font-weight:600;font-size:17px}
+.brand span{font-family:var(--jp);color:var(--muted);font-size:15px}
+.icon{width:40px;height:40px;display:grid;place-items:center;border-radius:10px;color:var(--fg)}
+.icon:hover{background:var(--line)}
+.icon:disabled{opacity:.3;cursor:default;background:none}
+.icon svg{width:22px;height:22px}
+
+.counts{display:flex;gap:14px;font-size:18px;font-variant-numeric:tabular-nums;padding-block:4px 0}
+.counts span{padding-bottom:1px;border-bottom:2px solid transparent}
+.c-new{color:var(--easy)} .c-lrn{color:var(--again)} .c-rev{color:var(--good)}
+.counts span.on{border-color:currentColor}
+
+.stage{flex:1;overflow:auto;padding-block:20px;text-align:center;min-height:0}
+.dir{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:22px}
+.kana{font-family:var(--jp);font-weight:600;font-size:clamp(34px,9vw,48px);line-height:1.3;overflow-wrap:anywhere}
+.kanji{font-family:var(--jp);font-size:clamp(24px,6.5vw,32px);color:var(--muted);margin-top:6px;overflow-wrap:anywhere}
+.ru{font-size:clamp(20px,5.5vw,26px);line-height:1.4;max-width:30ch;margin:0 auto;text-wrap:balance}
+.ru.front{font-size:clamp(24px,6.5vw,32px);font-weight:500}
+.note{display:block;font-size:15px;color:var(--muted);margin-top:8px}
+hr{border:0;border-top:1px solid var(--line);margin:22px 0}
+
+.done{padding-top:12vh;color:var(--muted);line-height:1.6}
+.done b{display:block;color:var(--fg);font-size:22px;font-weight:600;margin-bottom:6px}
+.done .jp{font-family:var(--jp);font-size:40px;color:var(--accent);display:block;margin-bottom:10px}
+
+.bar{padding-block:10px calc(12px + env(safe-area-inset-bottom,0px))}
+.show{width:100%;height:58px;border:1px solid var(--line);border-radius:14px;background:var(--surface);font-weight:600;font-size:17px}
+.grades{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+.grades button{padding-block:10px;display:flex;flex-direction:column;align-items:center;gap:2px;border-left:1px solid var(--line)}
+.grades button:first-child{border-left:0}
+.grades button:hover{background:var(--bg)}
+.grades small{font-size:13px;font-variant-numeric:tabular-nums}
+.grades strong{font-size:16px;font-weight:600}
+.g1{color:var(--again)} .g2{color:var(--hard)} .g3{color:var(--good)} .g4{color:var(--easy)}
+.keys{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}
+@media (hover:none){.keys{display:none}}
+
+/* sheets */
+.sheet{flex:1;overflow:auto;padding-block:10px 24px;min-height:0}
+.sheet h2{font-size:20px;font-weight:600;margin:6px 0 14px}
+.list{width:100%;border-collapse:collapse}
+.list td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.list td:first-child{padding-left:0}
+.list .k{font-family:var(--jp);font-size:19px;font-weight:600;white-space:nowrap}
+.list .kj{font-family:var(--jp);color:var(--muted);font-size:16px;white-space:nowrap}
+.list .r{font-size:15px;line-height:1.4}
+.st{display:flex;gap:4px;justify-content:flex-end}
+.chip{font-size:11px;padding:2px 6px;border-radius:6px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.chip.l{color:var(--again);border-color:currentColor}
+.chip.r{color:var(--good);border-color:currentColor}
+.tablewrap{overflow-x:auto}
+
+.field{display:flex;flex-direction:column;gap:10px;padding-block:14px;border-bottom:1px solid var(--line)}
+.field>label,.field>.lbl{font-weight:600}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:15px}
+.seg button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:600}
+input[type=number]{width:96px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg);font:inherit}
+.hint{font-size:14px;color:var(--muted);line-height:1.5}
+.danger{padding:8px 12px;border:1px solid var(--again);color:var(--again);border-radius:10px;align-self:flex-start}
+.confirm{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.confirm .yes{background:var(--again);color:var(--surface);padding:8px 12px;border-radius:10px}
+.confirm .no{padding:8px 12px;border:1px solid var(--line);border-radius:10px}
+
+/* ── phone ── */
+button{touch-action:manipulation}
+.bar,.top,.counts{user-select:none;-webkit-user-select:none}
+.stage{display:flex;flex-direction:column}
+.stage>.card{margin-block:auto;padding-bottom:6vh}
+.stage.tap{cursor:pointer}
+.taphint{font-size:13px;color:var(--muted);margin-top:28px}
+@media (hover:hover){.taphint{display:none}}
+@media (max-width:560px){
+  .top{padding-block:8px 2px;gap:2px}
+  .brand b{font-size:16px}
+  .icon{width:44px;height:44px}
+  .counts{font-size:17px}
+  .stage{padding-block:12px}
+  .dir{margin-bottom:16px}
+  hr{margin:18px 0}
+  .show{height:64px;font-size:18px}
+  .grades button{padding-block:14px;min-height:68px;justify-content:center}
+  .grades small{font-size:12px}
+  .grades strong{font-size:15px}
+  /* list becomes cards */
+  .list,.list tbody,.list tr,.list td{display:block;width:100%}
+  .list tr{padding-block:12px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:auto 1fr;column-gap:12px;row-gap:6px;align-items:baseline}
+  .list td{border:0;padding:0}
+  .list td:first-child{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;grid-column:1/-1}
+  .list td.r{grid-column:1/-1}
+  .list td:last-child{grid-column:1/-1}
+  .st{justify-content:flex-start}
+  .seg{flex-direction:column}
+  .seg button{width:100%;text-align:left;padding:12px 14px}
+  input[type=number]{width:100%;padding:12px}
+  .danger,.confirm .yes,.confirm .no{padding:12px 16px}
+}
+@media (max-width:360px){
+  .grades strong{font-size:14px}
+  .brand span{display:none}
+}
+
+/* ── desktop app: updates ── */
+body{margin:0;user-select:none;-webkit-user-select:none}
+.banner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;margin-block:4px 2px;border:1px solid var(--accent);border-radius:12px;background:var(--surface);font-size:14px}
+.banner span{flex:1;min-width:0}
+.banner .go{padding:6px 12px;border-radius:8px;background:var(--accent);color:var(--surface);font-weight:600}
+.banner .x{width:28px;height:28px;border-radius:8px;color:var(--muted);font-size:18px;line-height:1}
+.btn{padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-weight:500;align-self:flex-start}
+.btn.primary{border-color:var(--accent);color:var(--accent);font-weight:600}
+.btn:disabled{opacity:.5;cursor:default}
+.upd-row{display:flex;gap:8px;flex-wrap:wrap}
+.upd-status{font-size:15px;line-height:1.5}
+.upd-status:empty{display:none}
+.upd-status.err{color:var(--again)}
+.upd-status.ok{color:var(--good)}
+.notes{font-size:14px;color:var(--muted);white-space:pre-wrap;line-height:1.5;max-height:160px;overflow:auto;border-left:2px solid var(--line);padding-left:10px}
+.notes:empty{display:none}
+.progress{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.progress i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.toggle{display:flex;align-items:center;gap:10px;font-size:15px;cursor:pointer}
+.toggle input{width:18px;height:18px;accent-color:var(--accent)}
+
+@media (prefers-reduced-motion:no-preference){
+  .reveal{animation:in .18s ease-out}
+  @keyframes in{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}
+}
+</style>
+</head>
+<body>
+
+
+<div class="app">
+  <div class="top">
+    <div class="brand"><b>Урок 4</b><span>だい４か</span></div>
+    <button class="icon" id="undoBtn" aria-label="Отменить последний ответ" title="Отменить (Z)" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+    </button>
+    <button class="icon" id="listBtn" aria-label="Список слов" title="Список слов">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+    </button>
+    <button class="icon" id="setBtn" aria-label="Настройки" title="Настройки">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+    </button>
+    <button class="icon" id="themeBtn" aria-label="Сменить тему" title="Тёмная / светлая тема">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg>
+    </button>
+  </div>
+
+  <div class="banner" id="banner" hidden>
+    <span id="bannerText"></span>
+    <button class="go" id="bannerGo" hidden></button>
+    <button class="x" id="bannerX" aria-label="Скрыть">×</button>
+  </div>
+
+  <!-- study -->
+  <section id="study" style="display:contents">
+    <div class="counts" aria-label="Новые, изучаемые, на повторение">
+      <span class="c-new" id="cNew" title="Новые">0</span>
+      <span class="c-lrn" id="cLrn" title="Изучаемые">0</span>
+      <span class="c-rev" id="cRev" title="На повторение">0</span>
+    </div>
+    <div class="stage" id="stage"><noscript><div class="done"><span class="jp">あれ？</span><b>Этот просмотр не запускает скрипты</b>Открой файл в браузере (Safari, Chrome), и карточки заработают.</div></noscript></div>
+    <div class="bar" id="bar"></div>
+  </section>
+
+  <!-- list -->
+  <section class="sheet" id="listView" hidden>
+    <h2>Слова урока</h2>
+    <div class="tablewrap"><table class="list"><tbody id="listBody"></tbody></table></div>
+  </section>
+
+  <!-- settings -->
+  <section class="sheet" id="setView" hidden>
+    <h2>Настройки</h2>
+    <div class="field">
+      <span class="lbl">Направление</span>
+      <div class="seg" id="dirSeg">
+        <button data-dir="both">Оба</button>
+        <button data-dir="jr">日本語 → рус</button>
+        <button data-dir="rj">рус → 日本語</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="newPerDay">Новых карточек в день</label>
+      <input type="number" id="newPerDay" min="1" max="200" step="1">
+      <span class="hint">Сначала идут карточки «японский → русский», затем обратные.</span>
+    </div>
+    <div class="field" id="updField" hidden>
+      <span class="lbl">Обновления</span>
+      <span class="hint" id="updVer"></span>
+      <div class="upd-status" id="updStatus"></div>
+      <div class="progress" id="updProg" hidden><i id="updBar"></i></div>
+      <div class="notes" id="updNotes"></div>
+      <div class="upd-row">
+        <button class="btn" id="updCheck">Проверить обновления</button>
+        <button class="btn primary" id="updAction" hidden></button>
+      </div>
+      <label class="toggle"><input type="checkbox" id="updAuto"> Скачивать обновления автоматически</label>
+    </div>
+    <div class="field">
+      <span class="lbl">Прогресс</span>
+      <span class="hint">Прогресс хранится на этом компьютере и сохраняется при обновлениях.</span>
+      <button class="danger" id="resetBtn">Сбросить прогресс</button>
+      <div class="confirm" id="resetConfirm" hidden>
+        <span>Удалить весь прогресс?</span>
+        <button class="yes" id="resetYes">Удалить</button>
+        <button class="no" id="resetNo">Отмена</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+// [хирагана/катакана, кандзи (только из учебника), перевод, пояснение]
+const WORDS = [
+  ["おきます","起きます","вставать, просыпаться"],
+  ["ねます","寝ます","ложиться спать, спать, пребывать в покое"],
+  ["はたらきます","働きます","работать"],
+  ["やすみます","休みます","отдыхать, брать отпуск"],
+  ["べんきょうします","勉強します","заниматься, учиться"],
+  ["おわります","終わります","заканчивать, заканчиваться"],
+  ["デパート","","универмаг"],
+  ["ぎんこう","銀行","банк"],
+  ["ゆうびんきょく","郵便局","почта, почтовое отделение"],
+  ["としょかん","図書館","библиотека"],
+  ["びじゅつかん","美術館","художественный музей"],
+  ["いま","今","сейчас"],
+  ["～じ","～時","– часов"],
+  ["～ふん（～ぷん）","～分","– минут"],
+  ["はん","半","половина","например: половина седьмого"],
+  ["なんじ","何時","сколько времени"],
+  ["なんぷん","何分","сколько минут"],
+  ["ごぜん","午前","первая половина дня"],
+  ["ごご","午後","вторая половина дня"],
+  ["あさ","朝","утро"],
+  ["ひる","昼","день"],
+  ["ばん（よる）","晩（夜）","вечер (поздний вечер)"],
+  ["おととい","","позавчера"],
+  ["きのう","","вчера"],
+  ["きょう","","сегодня"],
+  ["あした","","завтра"],
+  ["あさって","","послезавтра"],
+  ["けさ","","сегодня утром"],
+  ["こんばん","今晩","сегодня вечером"],
+  ["やすみ","休み","выходной день, праздничный день; отдых, перерыв"],
+  ["ひるやすみ","昼休み","обеденный перерыв"],
+  ["しけん","試験","экзамен"],
+  ["かいぎ","会議","собрание, заседание, совещание","～を します: проводить собрание, устраивать совещание"],
+  ["えいが","映画","кинофильм"],
+  ["まいあさ","毎朝","каждое утро"],
+  ["まいばん","毎晩","каждый вечер"],
+  ["まいにち","毎日","каждый день"],
+  ["げつようび","月曜日","понедельник"],
+  ["かようび","火曜日","вторник"],
+  ["すいようび","水曜日","среда"],
+  ["もくようび","木曜日","четверг"],
+  ["きんようび","金曜日","пятница"],
+  ["どようび","土曜日","суббота"],
+  ["にちようび","日曜日","воскресенье"],
+  ["なんようび","何曜日","какой день недели"],
+  ["～から","","с ～"],
+  ["～まで","","до ～"],
+  ["～と ～","","и","соединительная частица для связи однородных именных членов предложения"],
+  ["たいへんですね","大変ですね","Да, ужасно.","выражение сочувствия"],
+  ["ばんごう","番号","номер (телефона, квартиры и т.п.)"],
+  ["なんばん","何番","какой номер"],
+  ["そちら","","у вас","у собеседника, при звонке в универмаг, музей, фирму и т.п."],
+  ["ニューヨーク","","Нью-Йорк"],
+  ["ペキン","北京","Пекин"],
+  ["ロサンゼルス","","Лос-Анджелес"],
+  ["ロンドン","","Лондон"],
+];
+
+const KEY = "tango-l4-v1", MIN = 60000, DAY = 86400000, AHEAD = 20 * MIN;
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let S = { cards:{}, day:"", newToday:0, dir:"both", newPerDay:20 };
+try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(S, JSON.parse(raw)); } catch(e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} };
+
+const today = () => { const d = new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); };
+const endOfDay = () => { const d = new Date(); d.setHours(23,59,59,999); return d.getTime(); };
+function rollDay(){ const t = today(); if (S.day !== t) { S.day = t; S.newToday = 0; save(); } }
+
+// all card ids in introduction order: every jp→ru first, then ru→jp
+function activeIds(){
+  const ids = [];
+  if (S.dir !== "rj") WORDS.forEach((_, i) => ids.push(i + "-jr"));
+  if (S.dir !== "jr") WORDS.forEach((_, i) => ids.push(i + "-rj"));
+  return ids;
+}
+
+// Anki-like scheduler
+function schedule(c, g, now){
+  c = c ? { ...c } : { s:"n" };
+  if (c.s === "n") Object.assign(c, { s:"l", step:0, ease:2.5, ivl:0, lapses:0, lapsed:false });
+  const grad = d => Object.assign(c, { s:"r", ivl:d, due: now + d*DAY, lapsed:false });
+  if (c.s === "l") {
+    if (g === 1) { c.step = 0; c.due = now + (c.lapsed ? 10 : 1) * MIN; }
+    else if (g === 2) { c.due = now + (c.step === 0 && !c.lapsed ? 6 : 10) * MIN; }
+    else if (g === 3) { if (c.step >= 1 || c.lapsed) grad(c.lapsed ? c.ivl : 1); else { c.step = 1; c.due = now + 10*MIN; } }
+    else grad(c.lapsed ? c.ivl + 1 : 4);
+  } else {
+    let i = c.ivl;
+    if (g === 1) { Object.assign(c, { s:"l", step:0, lapsed:true, lapses:c.lapses+1, ease:Math.max(1.3, c.ease-.2), ivl:Math.max(1, Math.round(i*.5)), due:now+10*MIN }); return c; }
+    if (g === 2) { i = Math.max(i+1, Math.round(i*1.2)); c.ease = Math.max(1.3, c.ease-.15); }
+    if (g === 3) i = Math.max(i+1, Math.round(i*c.ease));
+    if (g === 4) { i = Math.max(i+2, Math.round(i*c.ease*1.3)); c.ease += .15; }
+    c.ivl = i; c.due = now + i*DAY;
+  }
+  return c;
+}
+function fmt(ms){
+  const m = Math.round(ms / MIN);
+  if (m < 60) return "<" + Math.max(1, m) + " мин.";
+  const d = Math.round(ms / DAY);
+  if (d < 1) return "<" + Math.round(ms / 3600000) + " ч.";
+  if (d < 30) return d + " дн.";
+  if (d < 365) return (d/30).toFixed(1).replace(".0","") + " мес.";
+  return (d/365).toFixed(1).replace(".0","") + " г.";
+}
+
+function stats(){
+  const ids = activeIds(), eod = endOfDay();
+  let n = 0, l = 0, r = 0;
+  for (const id of ids) {
+    const c = S.cards[id];
+    if (!c) n++; else if (c.s === "l") l++; else if (c.due <= eod) r++;
+  }
+  return { n: Math.min(n, Math.max(0, S.newPerDay - S.newToday)), l, r };
+}
+function pick(){
+  rollDay();
+  const now = Date.now(), eod = endOfDay(), ids = activeIds();
+  const by = f => ids.filter(f).sort((a,b) => S.cards[a].due - S.cards[b].due)[0];
+  return by(id => S.cards[id]?.s === "l" && S.cards[id].due <= now)
+      || by(id => S.cards[id]?.s === "r" && S.cards[id].due <= eod)
+      || (S.newToday < S.newPerDay ? ids.find(id => !S.cards[id]) : null)
+      || by(id => S.cards[id]?.s === "l" && S.cards[id].due <= now + AHEAD)
+      || null;
+}
+
+let cur = null, shown = false, history = [], waitTimer = null;
+
+function faceJP(w){ return `<div class="kana">${esc(w[0])}</div>` + (w[1] ? `<div class="kanji">${esc(w[1])}</div>` : ""); }
+function faceRU(w, front){ return `<div class="ru${front?" front":""}">${esc(w[2])}${w[3] ? `<span class="note">${esc(w[3])}</span>` : ""}</div>`; }
+
+function render(){
+  clearTimeout(waitTimer);
+  const st = stats();
+  $("cNew").textContent = st.n; $("cLrn").textContent = st.l; $("cRev").textContent = st.r;
+  $("undoBtn").disabled = !history.length;
+  const kind = cur ? (!S.cards[cur] ? "cNew" : S.cards[cur].s === "l" ? "cLrn" : "cRev") : "";
+  ["cNew","cLrn","cRev"].forEach(k => $(k).classList.toggle("on", k === kind));
+
+  if (!cur) {
+    const ids = activeIds(), lrn = ids.filter(id => S.cards[id]?.s === "l");
+    let extra = "";
+    if (lrn.length) {
+      const next = Math.min(...lrn.map(id => S.cards[id].due)) - Date.now();
+      extra = `<br>${lrn.length} в изучении вернутся через ${fmt(next).replace("<","~")}`;
+      waitTimer = setTimeout(() => { cur = pick(); shown = false; render(); }, Math.max(5000, next - AHEAD + 1000));
+    }
+    $("stage").classList.remove("tap");
+    $("stage").innerHTML = `<div class="done"><span class="jp">おつかれさま</span><b>На сегодня всё</b>Новые карточки и повторения закончились.${extra}</div>`;
+    $("bar").innerHTML = "";
+    return;
+  }
+  const [i, dir] = cur.split("-"), w = WORDS[+i];
+  const label = dir === "jr" ? "日本語 → русский" : "русский → 日本語";
+  const front = dir === "jr" ? faceJP(w) : faceRU(w, true);
+  const back  = dir === "jr" ? faceRU(w) : faceJP(w);
+  $("stage").innerHTML = `<div class="card"><div class="dir">${label}</div>${front}${shown ? `<div class="reveal"><hr>${back}</div>` : `<div class="taphint">Нажми на карточку, чтобы увидеть ответ</div>`}</div>`;
+  $("stage").classList.toggle("tap", !shown);
+
+  if (!shown) {
+    $("bar").innerHTML = `<button class="show" id="showBtn">Показать ответ</button><div class="keys">Пробел — показать ответ</div>`;
+    $("showBtn").onclick = reveal;
+  } else {
+    const now = Date.now(), names = ["Снова","Трудно","Хорошо","Легко"];
+    $("bar").innerHTML = `<div class="grades">${names.map((n, k) =>
+      `<button class="g${k+1}" data-g="${k+1}"><small>${fmt(schedule(S.cards[cur], k+1, now).due - now)}</small><strong>${n}</strong></button>`).join("")}</div>
+      <div class="keys">1 · 2 · 3 · 4 — оценка, Z — отменить</div>`;
+    $("bar").querySelectorAll("[data-g]").forEach(b => b.onclick = () => answer(+b.dataset.g));
+  }
+}
+function reveal(){ if (cur && !shown) { shown = true; render(); } }
+function answer(g){
+  if (!cur || !shown) return;
+  const prev = S.cards[cur];
+  history.push({ id:cur, prev, newToday:S.newToday });
+  if (history.length > 50) history.shift();
+  if (!prev) S.newToday++;
+  S.cards[cur] = schedule(prev, g, Date.now());
+  save();
+  cur = pick(); shown = false; render();
+}
+function undo(){
+  const h = history.pop(); if (!h) return;
+  if (h.prev) S.cards[h.id] = h.prev; else delete S.cards[h.id];
+  S.newToday = h.newToday; save();
+  cur = h.id; shown = false; show("study"); render();
+}
+
+// views
+let view = "study";
+function show(v){
+  view = v;
+  $("study").hidden = false; $("study").style.display = v === "study" ? "contents" : "none";
+  $("listView").hidden = v !== "list"; $("setView").hidden = v !== "set";
+  $("listBtn").setAttribute("aria-pressed", v === "list"); $("setBtn").setAttribute("aria-pressed", v === "set");
+  if (v === "list") renderList();
+  if (v === "set") renderSettings();
+  if (v === "study") { if (!cur) cur = pick(); render(); }
+}
+function chip(id, tag){
+  const c = S.cards[id], now = Date.now();
+  if (!c) return `<span class="chip">${tag} новая</span>`;
+  if (c.s === "l") return `<span class="chip l">${tag} учу</span>`;
+  return `<span class="chip r">${tag} ${c.due <= now ? "сейчас" : fmt(c.due - now)}</span>`;
+}
+function renderList(){
+  $("listBody").innerHTML = WORDS.map((w, i) => `<tr>
+    <td><div class="k">${esc(w[0])}</div>${w[1] ? `<div class="kj">${esc(w[1])}</div>` : ""}</td>
+    <td class="r">${esc(w[2])}${w[3] ? `<br><span class="hint">${esc(w[3])}</span>` : ""}</td>
+    <td><div class="st">${chip(i+"-jr","日→")}${chip(i+"-rj","→日")}</div></td></tr>`).join("");
+}
+function renderSettings(){
+  $("dirSeg").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.dataset.dir === S.dir));
+  $("newPerDay").value = S.newPerDay;
+  $("resetConfirm").hidden = true; $("resetBtn").hidden = false;
+}
+$("dirSeg").onclick = e => { const b = e.target.closest("[data-dir]"); if (!b) return; S.dir = b.dataset.dir; save(); cur = null; renderSettings(); };
+$("newPerDay").onchange = e => { const v = Math.max(1, Math.min(200, Math.round(+e.target.value || 20))); S.newPerDay = v; e.target.value = v; save(); cur = null; };
+$("resetBtn").onclick = () => { $("resetConfirm").hidden = false; $("resetBtn").hidden = true; };
+$("resetNo").onclick = renderSettings;
+$("resetYes").onclick = () => { S.cards = {}; S.newToday = 0; history = []; cur = null; save(); show("study"); };
+
+$("listBtn").onclick = () => show(view === "list" ? "study" : "list");
+$("setBtn").onclick  = () => show(view === "set" ? "study" : "set");
+$("undoBtn").onclick = undo;
+$("stage").onclick = () => { if (cur && !shown) reveal(); };
+
+// theme
+const root = document.documentElement;
+try { const t = localStorage.getItem("tango-theme"); if (t) root.dataset.theme = t; } catch(e) {}
+$("themeBtn").onclick = () => {
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("tango-theme", root.dataset.theme); } catch(e) {}
+  syncTheme();
+};
+function syncTheme(){
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  hostSend({ type:"theme", dark });
+}
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncTheme);
+
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" || view !== "study") return;
+  if ((e.key === " " || e.key === "Enter") && !shown) { e.preventDefault(); reveal(); }
+  else if (shown && "1234".includes(e.key) && e.key) answer(+e.key);
+  else if (e.key === "z" || e.key === "я") undo();
+});
+
+// ───────── связь с программой (обновления) ─────────
+const wv = window.chrome && window.chrome.webview;
+function hostSend(m){ try { wv && wv.postMessage(m); } catch(e) {} }
+
+const U = { version:"", enabled:false, state:"idle", newVer:"", progress:0, message:"", notes:"", bannerHidden:false };
+
+function renderUpdates(){
+  $("updVer").textContent = "Установлена версия " + U.version;
+  const st = $("updStatus"), act = $("updAction"), chk = $("updCheck");
+  st.className = "upd-status"; act.hidden = true; chk.disabled = false; $("updProg").hidden = true; $("updNotes").textContent = "";
+  switch (U.state) {
+    case "disabled": st.textContent = "Автообновление работает в версии, скачанной с GitHub."; chk.disabled = true; break;
+    case "checking": st.textContent = "Проверяю…"; chk.disabled = true; break;
+    case "latest":   st.textContent = "У тебя последняя версия."; st.classList.add("ok"); break;
+    case "available":
+      st.textContent = "Доступна версия " + U.newVer + ".";
+      $("updNotes").textContent = U.notes || "";
+      act.textContent = "Скачать и установить"; act.dataset.do = "download"; act.hidden = false; break;
+    case "downloading":
+      st.textContent = "Скачиваю версию " + U.newVer + "… " + Math.round(U.progress*100) + "%";
+      $("updProg").hidden = false; $("updBar").style.width = (U.progress*100) + "%"; chk.disabled = true; break;
+    case "ready":
+      st.textContent = "Версия " + U.newVer + " скачана. Она установится при следующем запуске, или перезапусти сейчас.";
+      st.classList.add("ok"); $("updNotes").textContent = U.notes || "";
+      act.textContent = "Перезапустить и обновить"; act.dataset.do = "install"; act.hidden = false; break;
+    case "error": st.textContent = U.message; st.classList.add("err"); break;
+    default: st.textContent = "";
+  }
+  // плашка сверху
+  const b = $("banner"), go = $("bannerGo");
+  if (U.state === "ready" && !U.bannerHidden) {
+    $("bannerText").textContent = "Обновление " + U.newVer + " готово";
+    go.textContent = "Перезапустить"; go.dataset.do = "install"; go.hidden = false; b.hidden = false;
+  } else if (U.justUpdated && !U.bannerHidden) {
+    $("bannerText").textContent = "Тангочо обновлён до версии " + U.version;
+    go.hidden = true; b.hidden = false;
+  } else b.hidden = true;
+}
+
+if (wv) {
+  wv.addEventListener("message", e => {
+    const m = e.data || {};
+    if (m.type === "info") {
+      U.version = m.version; U.enabled = m.enabled; U.justUpdated = !!m.justUpdated;
+      $("updAuto").checked = !!m.auto; $("updAuto").disabled = !m.enabled;
+      $("updField").hidden = false;
+      if (!m.enabled) U.state = "disabled";
+    } else if (m.type === "status") {
+      U.state = m.state;
+      if (m.version) U.newVer = m.version;
+      if (m.notes != null) U.notes = m.notes;
+      if (m.progress != null) U.progress = m.progress;
+      U.message = m.message || "";
+      if (m.state === "ready") U.bannerHidden = false;
+    }
+    renderUpdates();
+  });
+  $("updCheck").onclick = () => hostSend({ type:"check" });
+  $("updAction").onclick = e => hostSend({ type: e.currentTarget.dataset.do });
+  $("bannerGo").onclick = e => hostSend({ type: e.currentTarget.dataset.do });
+  $("bannerX").onclick = () => { U.bannerHidden = true; U.justUpdated = false; renderUpdates(); };
+  $("updAuto").onchange = e => hostSend({ type:"auto", value: e.target.checked });
+  document.addEventListener("contextmenu", e => e.preventDefault());
+  hostSend({ type:"ready" });
+  syncTheme();
+}
+
+show("study");
+</script>
+
+</body>
+</html>

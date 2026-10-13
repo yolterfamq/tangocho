@@ -1,0 +1,53 @@
+name: Release
+
+# Запускается, когда ты пушишь тег вида v1.0.1 (это делает release.bat)
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Version and notes from tag
+        id: meta
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $ver = $tag.TrimStart('v','V')
+          git fetch --force --tags | Out-Null
+          $notes = git tag -l --format='%(contents)' $tag
+          if (-not $notes) { $notes = "Версия $ver" }
+          $notes | Out-File -Encoding utf8 notes.md
+          "version=$ver" >> $env:GITHUB_OUTPUT
+
+      - name: Build Tangocho.exe
+        shell: pwsh
+        run: >
+          dotnet publish Tangocho.csproj -c Release -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          -p:DebugType=none
+          -p:Version=${{ steps.meta.outputs.version }}
+          -p:UpdateRepo=${{ github.repository }}
+          -o out
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Тангочо ${{ steps.meta.outputs.version }}
+          body_path: notes.md
+          files: out/Tangocho.exe
