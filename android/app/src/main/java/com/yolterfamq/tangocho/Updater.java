@@ -79,7 +79,10 @@ public final class Updater {
     public static Release check(Context ctx) throws Exception {
         HttpURLConnection c = open("https://api.github.com/repos/" + repo() + "/releases/latest");
         try {
-            if (c.getResponseCode() != 200) throw new IOException("GitHub ответил " + c.getResponseCode());
+            int code = c.getResponseCode();
+            // Без входа GitHub даёт 60 запросов к API в час с одного IP. Упёрлись — узнаём версию со страницы релизов.
+            if (code == 403 || code == 429) return checkViaPage(ctx);
+            if (code != 200) throw new IOException("GitHub ответил " + code);
             InputStream in = c.getInputStream();
             ByteArrayOutputStream buf = new ByteArrayOutputStream();
             byte[] b = new byte[8192]; int n;
@@ -100,6 +103,30 @@ public final class Updater {
                 }
             }
             if (r.url == null || r.version.isEmpty()) return null;
+            return compare(r.version, currentVersion(ctx)) > 0 ? r : null;
+        } finally {
+            c.disconnect();
+        }
+    }
+
+    /** Запасной способ без API: github.com/…/releases/latest перенаправляет на …/releases/tag/vX.Y.Z */
+    private static Release checkViaPage(Context ctx) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL("https://github.com/" + repo() + "/releases/latest").openConnection();
+        c.setInstanceFollowRedirects(false);
+        c.setConnectTimeout(15000);
+        c.setReadTimeout(15000);
+        c.setRequestProperty("User-Agent", "Tangocho-Android");
+        try {
+            c.getResponseCode();
+            String loc = c.getHeaderField("Location");
+            int i = loc == null ? -1 : loc.lastIndexOf("/tag/");
+            if (i < 0) throw new IOException("GitHub не ответил, какая версия последняя");
+            String tag = java.net.URLDecoder.decode(loc.substring(i + 5), "UTF-8");
+            Release r = new Release();
+            r.version = tag.replaceAll("^[vV]", "");
+            r.notes = "";
+            r.url = "https://github.com/" + repo() + "/releases/download/" + tag + "/" + APK_NAME;
+            r.size = 0;
             return compare(r.version, currentVersion(ctx)) > 0 ? r : null;
         } finally {
             c.disconnect();
