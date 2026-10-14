@@ -41,17 +41,18 @@ Android ставит обновление только поверх прилож
 4. **Build → Firestore Database → Create database** → режим *production*, регион поближе (например `eur3`). Вкладка **Rules** → вставь содержимое `firestore.rules` → **Publish**.
 5. **⚙ Project settings → Your apps → Web (`</>`)** → зарегистрируй приложение → скопируй `apiKey`, `authDomain`, `projectId`, `appId` в `web/config.js`.
 
-## Ребека: Gemini + Cloudflare (один раз)
+## Ребека: Claude + Cloudflare (один раз)
 
-1. Ключ Gemini: https://aistudio.google.com → **Get API key → Create API key** → скопируй.
+1. Ключ Claude: https://console.anthropic.com → **API Keys → Create Key**. На счёте должны быть деньги (**Billing**). Один ответ с фото стоит примерно 1–2 цента.
 2. https://dash.cloudflare.com (регистрация бесплатная) → **Workers & Pages → Create → Worker** → имя `rebecca` → **Deploy**.
 3. **Edit code** → замени весь код содержимым `rebecca-worker/worker.js` → **Deploy**.
 4. Воркер → **Settings → Variables and Secrets → Add**:
-   - `GEMINI_API_KEY` — тип **Secret**, ключ из шага 1;
-   - `FIREBASE_PROJECT_ID` — id проекта Firebase (из `config.js`);
-   - `ALLOWED_EMAILS` — почты через запятую, кому можно говорить с Ребекой: твоя и её.
-5. Воркер → **Settings → Runtime → Placement → Smart**. Так запросы к Gemini пойдут из дата-центра рядом с Google, и не будет ошибки «регион не поддерживается».
+   - `ANTHROPIC_API_KEY` — тип **Secret**, ключ из шага 1;
+   - `ALLOWED_EMAILS` — тип Text, почты через запятую, кому можно говорить с Ребекой: твоя и её.
+5. Воркер → **Settings → Runtime → Placement → Smart**.
 6. Скопируй адрес воркера (`https://rebecca.<что-то>.workers.dev`) в `rebeccaUrl` в `web/config.js`.
+
+Модель по умолчанию — `claude-sonnet-5-5`, запасная — `claude-haiku-5-5`. Поменять можно переменными `CLAUDE_MODEL` и `CLAUDE_FALLBACK`.
 
 Если входите по почте и паролю, почту нужно подтвердить: письмо приходит при регистрации. С Google-аккаунтом подтверждать ничего не нужно.
 
@@ -91,7 +92,7 @@ Android ставит обновление только поверх прилож
 | `web/account.js` | Вход и синхронизация прогресса |
 | `web/rebecca.js` | Чат с Ребекой: фото, история, формулы |
 | `web/auth.html` | Страница входа через Google для приложений |
-| `rebecca-worker/worker.js` | Сервер Ребеки для Cloudflare (ключ Gemini хранится там) |
+| `rebecca-worker/worker.js` | Сервер Ребеки для Cloudflare (ключ Claude хранится там) |
 | `firestore.rules` | Правила базы: каждый видит только свои данные |
 | `MainWindow.xaml(.cs)` | Окно программы и связь со страницей |
 | `Updater.cs` | Проверка, скачивание и установка обновлений с GitHub |

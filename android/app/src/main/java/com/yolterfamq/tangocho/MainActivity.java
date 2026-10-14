@@ -99,10 +99,10 @@ public class MainActivity extends Activity {
                 fileCallback = cb;
                 Intent i = new Intent(Intent.ACTION_GET_CONTENT);
                 i.addCategory(Intent.CATEGORY_OPENABLE);
-                i.setType("image/*");
+                i.setType("*/*");
                 i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
                 try {
-                    startActivityForResult(Intent.createChooser(i, "Фото для Ребеки"), PICK_FILES);
+                    startActivityForResult(Intent.createChooser(i, "Файл для Ребеки"), PICK_FILES);
                 } catch (ActivityNotFoundException e) {
                     fileCallback = null;
                     return false;

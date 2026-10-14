@@ -2,11 +2,13 @@
 (function () {
   const C = window.TANGOCHO_CONFIG || {};
   const URL_ = (C.rebeccaUrl || "").replace(/\/+$/, "");
-  const MAX_IMAGES = 4, HISTORY = 20;
+  const MAX_IMAGES = 3, HISTORY = 20;
+  const MAX_DOC_CHARS = 15000;        // столько текста из файлов уходит в одном сообщении (бесплатные ИИ не любят огромные запросы)
+  const MAX_FILE_MB = 25;
 
   const R = window.Rebecca = {};
   let chat = null;            // { id, title, created, updated, msgs:[{role, text, thumbs:[]}] }
-  let atts = [];              // [{ data, mime, thumb }]
+  let atts = [];              // [{ kind:"image", data, mime, thumb } | { kind:"doc", name, ext, text, truncated } | { kind:"loading", name }]
   let streaming = null;       // AbortController
   let libs = null;
   let listOpen = false;
@@ -74,13 +76,144 @@
     });
   }
 
+  // ───────── документы: txt, docx, pdf, xlsx, pptx, odt, rtf, код ─────────
+  const LIB = {
+    mammoth: "https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js",
+    xlsx: "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
+    jszip: "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js",
+    pdf: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js",
+    pdfWorker: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js",
+  };
+  const loaded = {};
+  const need = k => loaded[k] || (loaded[k] = load(LIB[k]).catch(e => { delete loaded[k]; throw new Error("Нет интернета, не удалось загрузить чтение файлов"); }));
+
+  const TEXT_EXT = "txt md markdown csv tsv json xml html htm log ini cfg conf yml yaml toml py js ts jsx tsx cs java kt cpp c h hpp lua sql php rb go rs swift sh bat ps1 css scss srt vtt tex".split(" ");
+  const extOf = name => (name.split(".").pop() || "").toLowerCase();
+
+  function decodeText(buf) {
+    let t = new TextDecoder("utf-8").decode(buf);
+    const bad = (t.match(/\uFFFD/g) || []).length;
+    if (bad > 3 && bad > t.length / 200) {                 // похоже на Windows-1251 (старые русские txt)
+      try { t = new TextDecoder("windows-1251").decode(buf); } catch (e) {}
+    }
+    return t.replace(/^\uFEFF/, "");
+  }
+  const looksBinary = buf => { const b = new Uint8Array(buf.slice(0, 2000)); let z = 0; for (const x of b) if (x === 0) z++; return z > 2; };
+  const xmlText = (xml, para) => xml.replace(new RegExp("</(" + para + ")>", "g"), "\n").replace(/<[^>]+>/g, "")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+
+  async function readPdf(buf, name) {
+    await need("pdf");
+    const pdfjs = window.pdfjsLib;
+    pdfjs.GlobalWorkerOptions.workerSrc = LIB.pdfWorker;
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
+    let text = "";
+    for (let i = 1; i <= Math.min(doc.numPages, 60) && text.length < MAX_DOC_CHARS * 2; i++) {
+      const page = await doc.getPage(i);
+      const c = await page.getTextContent();
+      text += (doc.numPages > 1 ? "\n— стр. " + i + " —\n" : "") + c.items.map(it => it.str + (it.hasEOL ? "\n" : " ")).join("");
+    }
+    if (text.replace(/\s|— стр\. \d+ —/g, "").length > 40) return { text };
+    // Скан без текста — отправим первые страницы как картинки
+    const images = [];
+    for (let i = 1; i <= Math.min(doc.numPages, MAX_IMAGES); i++) {
+      const page = await doc.getPage(i);
+      const vp0 = page.getViewport({ scale: 1 });
+      const vp = page.getViewport({ scale: Math.min(2, 1600 / Math.max(vp0.width, vp0.height)) });
+      const cv = document.createElement("canvas"); cv.width = vp.width; cv.height = vp.height;
+      await page.render({ canvasContext: cv.getContext("2d"), viewport: vp }).promise;
+      const big = cv.toDataURL("image/jpeg", 0.85);
+      const t = document.createElement("canvas"), k = 160 / Math.max(cv.width, cv.height);
+      t.width = cv.width * k; t.height = cv.height * k; t.getContext("2d").drawImage(cv, 0, 0, t.width, t.height);
+      images.push({ kind: "image", mime: "image/jpeg", data: big.split(",")[1], thumb: t.toDataURL("image/jpeg", 0.7), name: name + " · стр. " + i });
+    }
+    return { images, scanned: true, pages: doc.numPages };
+  }
+
+  async function readDoc(f) {
+    const ext = extOf(f.name);
+    if (f.size > MAX_FILE_MB * 1024 * 1024) throw new Error(`Файл «${f.name}» больше ${MAX_FILE_MB} МБ`);
+    const buf = await f.arrayBuffer();
+    if (ext === "pdf" || f.type === "application/pdf") return readPdf(buf, f.name);
+    if (ext === "docx" || ext === "docm") {
+      await need("mammoth");
+      return { text: (await mammoth.extractRawText({ arrayBuffer: buf })).value };
+    }
+    if (["xlsx", "xlsm", "xls", "ods"].includes(ext)) {
+      await need("xlsx");
+      const wb = XLSX.read(new Uint8Array(buf), { type: "array" });
+      return { text: wb.SheetNames.map(n => "Лист «" + n + "»:\n" + XLSX.utils.sheet_to_csv(wb.Sheets[n], { blankrows: false })).join("\n\n") };
+    }
+    if (ext === "pptx" || ext === "odt" || ext === "odp") {
+      await need("jszip");
+      const zip = await JSZip.loadAsync(buf);
+      if (ext === "pptx") {
+        const slides = Object.keys(zip.files).filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+          .sort((a, b) => +a.match(/\d+/)[0] - +b.match(/\d+/)[0]);
+        const parts = [];
+        for (const [i, n] of slides.entries()) {
+          const xml = await zip.file(n).async("string");
+          const t = (xml.match(/<a:t>([^<]*)<\/a:t>/g) || []).map(x => xmlText(x, "a:t")).join(" ");
+          parts.push("Слайд " + (i + 1) + ": " + t.trim());
+        }
+        return { text: parts.join("\n") };
+      }
+      const xml = await zip.file("content.xml").async("string");
+      return { text: xmlText(xml, "text:p|text:h") };
+    }
+    if (ext === "rtf") {
+      const raw = decodeText(buf);
+      return { text: raw.replace(/\\par[d]?/g, "\n").replace(/\{\\\*[^}]*\}/g, "").replace(/\\'([0-9a-f]{2})/gi, (_, h) => new TextDecoder("windows-1251").decode(new Uint8Array([parseInt(h, 16)])))
+        .replace(/\\[a-z]+-?\d* ?/gi, "").replace(/[{}]/g, "") };
+    }
+    if (ext === "doc" || ext === "ppt") throw new Error(`Старый формат .${ext} не читается. Открой файл в Word/PowerPoint и сохрани как .${ext}x`);
+    if (TEXT_EXT.includes(ext) || f.type.startsWith("text/") || !looksBinary(buf)) return { text: decodeText(buf) };
+    throw new Error(`Файл «${f.name}» не похож на документ, который я умею читать`);
+  }
+
+  const imgCount = () => atts.filter(a => a.kind === "image").length;
+
   async function addFiles(files) {
     for (const f of files) {
-      if (!f.type.startsWith("image/")) continue;
-      if (atts.length >= MAX_IMAGES) break;
-      try { atts.push(await readImage(f)); } catch (e) { toastErr(e.message); }
+      if (f.type.startsWith("image/")) {
+        if (imgCount() >= MAX_IMAGES) { toastErr(`За раз можно отправить до ${MAX_IMAGES} фото`); continue; }
+        try { atts.push({ kind: "image", ...(await readImage(f)) }); } catch (e) { toastErr(e.message); }
+        renderComposer();
+        continue;
+      }
+      const slot = { kind: "loading", name: f.name };
+      atts.push(slot); renderComposer();
+      try {
+        const r = await readDoc(f);
+        const i = atts.indexOf(slot);
+        if (i < 0) continue;                                  // убрали, пока читали
+        if (r.images) {
+          const room = MAX_IMAGES - imgCount();
+          atts.splice(i, 1, ...r.images.slice(0, Math.max(0, room)));
+          if (room <= 0) toastErr("В PDF нет текста (это скан), а места для фото уже нет — убери фото и прикрепи снова");
+        } else {
+          const text = (r.text || "").replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+          if (!text) { atts.splice(i, 1); toastErr(`В файле «${f.name}» не нашлось текста`); }
+          else atts.splice(i, 1, { kind: "doc", name: f.name, ext: extOf(f.name), text });
+        }
+      } catch (e) {
+        const i = atts.indexOf(slot); if (i >= 0) atts.splice(i, 1);
+        toastErr(e.message || String(e));
+      }
+      renderComposer();
     }
-    renderComposer();
+  }
+
+  /** Текст всех документов для отправки, с общим ограничением по длине */
+  function docsBlock(docs) {
+    let left = MAX_DOC_CHARS, out = [];
+    for (const d of docs) {
+      const part = d.text.slice(0, Math.max(0, left));
+      const cut = part.length < d.text.length;
+      left -= part.length;
+      out.push(`Файл «${d.name}»${cut ? ` (большой, показано начало: ${part.length} из ${d.text.length} символов)` : ""}:\n"""\n${part}\n"""`);
+    }
+    return out.join("\n\n");
   }
 
   // ───────── хранение чатов ─────────
@@ -143,7 +276,8 @@
 
   function msgHtml(m, i) {
     const imgs = m.thumbs && m.thumbs.length ? `<div class="imgs">${m.thumbs.map(t => `<img src="${t}" alt="Фото">`).join("")}</div>` : "";
-    if (m.role === "user") return `<div class="m user">${imgs}${esc(m.text || "")}</div>`;
+    const files = m.files && m.files.length ? `<div class="files">${m.files.map(f => `<span class="fchip"><b>${esc((f.ext || "файл").toUpperCase())}</b>${esc(f.name)}</span>`).join("")}</div>` : "";
+    if (m.role === "user") return `<div class="m user">${imgs}${files}${esc(m.text || "")}</div>`;
     return `<div class="m bot" data-i="${i}"><div class="who">Ребека</div><div class="body">${m.error ? `<span class="err">${esc(m.error)}</span>` : m.text ? md(m.text) : `<span class="typing"><i></i><i></i><i></i></span>`}</div>
       ${m.text && !m.pending ? `<div class="tools"><button data-copy="${i}">Копировать</button></div>` : ""}</div>`;
   }
@@ -171,14 +305,20 @@
   }
 
   function renderComposer() {
-    el("atts").innerHTML = atts.map((a, i) => `<div class="att"><img src="${a.thumb}" alt=""><button data-rm="${i}" aria-label="Убрать фото">×</button></div>`).join("");
+    el("atts").innerHTML = atts.map((a, i) => a.kind === "image"
+      ? `<div class="att"><img src="${a.thumb}" alt=""><button data-rm="${i}" aria-label="Убрать фото">×</button></div>`
+      : `<div class="att file${a.kind === "loading" ? " loading" : ""}"><b>${a.kind === "loading" ? "…" : esc((a.ext || "файл").toUpperCase())}</b><span>${esc(a.kind === "loading" ? "Читаю " + a.name : a.name)}</span><button data-rm="${i}" aria-label="Убрать файл">×</button></div>`).join("");
     el("atts").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { atts.splice(+b.dataset.rm, 1); renderComposer(); });
     const empty = !el("chatInput").value.trim();
-    el("chips").innerHTML = atts.length && empty ? ["Реши задачу и объясни по шагам", "Перепиши текст с фото", "Объясни, что здесь", "Переведи на русский", "Проверь моё решение"]
-      .map(q => `<button data-chip="${esc(q)}">${esc(q)}</button>`).join("") : "";
+    const hasDocs = atts.some(a => a.kind === "doc"), hasImgs = atts.some(a => a.kind === "image");
+    const chipList = hasDocs
+      ? ["Кратко перескажи", "Реши задания из файла", "Сделай конспект", "Проверь на ошибки", "Переведи на русский"]
+      : ["Реши задачу и объясни по шагам", "Перепиши текст с фото", "Объясни, что здесь", "Переведи на русский", "Проверь моё решение"];
+    el("chips").innerHTML = (hasDocs || hasImgs) && empty ? chipList.map(q => `<button data-chip="${esc(q)}">${esc(q)}</button>`).join("") : "";
     el("chips").querySelectorAll("[data-chip]").forEach(b => b.onclick = () => send(b.dataset.chip));
     const btn = el("sendBtn");
-    btn.disabled = !streaming && empty && !atts.length;
+    const busyReading = atts.some(a => a.kind === "loading");
+    btn.disabled = !streaming && ((empty && !atts.length) || busyReading);
     btn.setAttribute("aria-label", streaming ? "Остановить" : "Отправить");
     btn.innerHTML = streaming
       ? `<svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></svg>`
@@ -203,25 +343,32 @@
     unauthorized: "Сессия устарела. Выйди и войди в аккаунт снова.",
     denied: "Этот аккаунт не в списке тех, кому доступна Ребека.",
     unverified: "Сначала подтверди почту (в настройках).",
-    limit: "Claude сейчас перегружен или упёрся в лимит запросов. Попробуй через минуту.",
-    billing: "На счёте Claude закончились деньги. Пополни баланс на console.anthropic.com → Billing.",
-    badkey: "Ключ Claude на сервере неверный. Проверь ANTHROPIC_API_KEY в настройках воркера.",
-    region: "Claude недоступен из региона сервера. Включи Smart Placement у воркера на Cloudflare (см. README).",
-    too_big: "Фото слишком большие. Отправь поменьше или по одному.",
+    limit: "Бесплатные лимиты ИИ на сейчас закончились. Попробуй через минуту, а если не поможет — позже.",
+    billing: "На счёте платного ИИ закончились деньги.",
+    badkey: "Ключ ИИ на сервере неверный или не задан. Проверь ключи в настройках воркера на Cloudflare.",
+    region: "ИИ недоступен из региона сервера. Включи Smart Placement у воркера на Cloudflare.",
+    too_big: "Файлы слишком большие. Отправь поменьше или по одному.",
   };
 
   async function send(text) {
     text = (text || "").trim();
+    if (atts.some(a => a.kind === "loading")) return;
     if (streaming || (!text && !atts.length)) return;
-    if (!text) text = "Реши задачу с фото и объясни по шагам";
+    const imgs = atts.filter(a => a.kind === "image"), docs = atts.filter(a => a.kind === "doc");
+    if (!text) text = docs.length ? "Прочитай файл и кратко расскажи, что в нём" : "Реши задачу с фото и объясни по шагам";
     if (!chat) chat = { id: newId(), title: "", created: Date.now(), updated: Date.now(), msgs: [] };
 
-    const images = atts.map(a => ({ mime: a.mime, data: a.data }));
-    const userMsg = { role: "user", text, thumbs: atts.map(a => a.thumb) };
+    const images = imgs.map(a => ({ mime: a.mime, data: a.data }));
+    const userMsg = { role: "user", text, thumbs: imgs.map(a => a.thumb),
+      files: docs.map(d => ({ name: d.name, ext: d.ext })), docText: docs.length ? docsBlock(docs) : "" };
     chat.msgs = chat.msgs.filter(m => !m.error);
     chat.msgs.push(userMsg);
-    if (!chat.title) chat.title = text.length > 48 ? text.slice(0, 46) + "…" : text;
-    const history = chat.msgs.slice(-HISTORY).map(m => ({ role: m.role, text: m.text || "" }));
+    if (!chat.title) chat.title = docs.length && text.startsWith("Прочитай файл") ? docs[0].name : (text.length > 48 ? text.slice(0, 46) + "…" : text);
+    // В историю целиком кладём только самые свежие документы — старые урезаем, чтобы влезть в бесплатные лимиты
+    const recent = chat.msgs.slice(-HISTORY);
+    const lastDocIdx = recent.map(m => !!m.docText).lastIndexOf(true);
+    const history = recent.map((m, i) => ({ role: m.role,
+      text: (m.text || "") + (m.docText ? "\n\n" + (i === lastDocIdx ? m.docText : m.docText.slice(0, 1500) + "\n…(файл сокращён)") : "") }));
     const bot = { role: "model", text: "", pending: true };
     chat.msgs.push(bot);
 
@@ -275,7 +422,8 @@
     if (gateReason === "denied") { renderMsgs(false); return; }
     // в облако сохраняем без ошибок и без пустых ответов
     const keep = chat.msgs.filter(m => !m.error && !m.pending);
-    const saved = { ...chat, msgs: keep.map(m => ({ role: m.role, text: m.text || "", thumbs: m.thumbs || [] })) };
+    const saved = { ...chat, msgs: keep.map(m => ({ role: m.role, text: m.text || "", thumbs: m.thumbs || [],
+      ...(m.files && m.files.length ? { files: m.files, docText: (m.docText || "").slice(0, MAX_DOC_CHARS + 2000) } : {}) })) };
     if (Account.user) col().doc(chat.id).set({ ...saved, updated: Date.now() }).catch(e => console.warn(e));
   }
 
@@ -321,7 +469,7 @@
     if (e.key === "Enter" && !e.shiftKey && !isTouch && !e.isComposing) { e.preventDefault(); send(el("chatInput").value); }
   });
   el("chatInput").addEventListener("paste", e => {
-    const files = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith("image/"));
+    const files = [...(e.clipboardData?.files || [])];
     if (files.length) { e.preventDefault(); addFiles(files); }
   });
   el("attachBtn").onclick = () => el("fileIn").click();

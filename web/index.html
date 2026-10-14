@@ -2,8 +2,18 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Тангочо · Урок 4</title>
+<!-- Приложение на экране «Домой» (iPhone / Android через браузер) -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Тангочо">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0c0e12" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f2f3f6" media="(prefers-color-scheme: light)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&family=Onest:wght@400;500;600&display=swap">
@@ -32,7 +42,10 @@ body{background:var(--bg);color:var(--fg);font-family:var(--ui);font-size:16px;-
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
 
-.app{height:100%;max-width:720px;margin:0 auto;padding-inline:16px;display:flex;flex-direction:column}
+.app{height:100%;max-width:720px;margin:0 auto;padding-inline:max(16px, env(safe-area-inset-left,0px));padding-top:env(safe-area-inset-top,0px);display:flex;flex-direction:column}
+.ios-hint{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;margin-block:4px 2px;border:1px solid var(--line);border-radius:12px;background:var(--surface);font-size:14px;line-height:1.45}
+.ios-hint span{flex:1;min-width:0}
+.ios-hint svg{width:16px;height:16px;vertical-align:-3px}
 .top{display:flex;align-items:center;gap:8px;padding-block:14px 6px}
 .brand{display:flex;align-items:baseline;gap:10px;flex:1;min-width:0}
 .brand b{font-weight:600;font-size:17px}
@@ -223,6 +236,13 @@ body{margin:0;user-select:none;-webkit-user-select:none}
 .atts:empty,.chips:empty{display:none}
 .att{position:relative;width:64px;height:64px}
 .att img{width:100%;height:100%;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.att.file{width:auto;max-width:220px;height:auto;display:flex;align-items:center;gap:8px;padding:8px 30px 8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:13px}
+.att.file b{font-size:11px;color:var(--accent);letter-spacing:.04em}
+.att.file span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att.file.loading{color:var(--muted)}
+.m .files{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.fchip{display:inline-flex;gap:6px;align-items:center;max-width:100%;padding:5px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fchip b{font-size:11px;color:var(--accent)}
 .att button{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--fg);color:var(--bg);font-size:14px;line-height:1}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chips button{padding:6px 11px;border:1px solid var(--accent);color:var(--accent);border-radius:999px;font-size:14px}
@@ -276,6 +296,11 @@ body{margin:0;user-select:none;-webkit-user-select:none}
     <button class="x" id="bannerX" aria-label="Скрыть">×</button>
   </div>
 
+  <div class="ios-hint" id="iosHint" hidden>
+    <span>Установи Тангочо как приложение: нажми <b>Поделиться</b> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg> внизу Safari → <b>На экран «Домой»</b>.</span>
+    <button class="x" id="iosHintX" aria-label="Скрыть">×</button>
+  </div>
+
   <!-- study -->
   <section id="study" style="display:contents">
     <div class="counts" aria-label="Новые, изучаемые, на повторение">
@@ -302,7 +327,7 @@ body{margin:0;user-select:none;-webkit-user-select:none}
       <div class="atts" id="atts"></div>
       <div class="chips" id="chips"></div>
       <div class="crow">
-        <button class="icon" id="attachBtn" aria-label="Прикрепить фото" title="Прикрепить фото">
+        <button class="icon" id="attachBtn" aria-label="Прикрепить фото или файл" title="Прикрепить фото или файл (txt, Word, PDF, Excel, PowerPoint)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-8 8"/></svg>
         </button>
         <textarea id="chatInput" rows="1" placeholder="Спроси Ребеку…"></textarea>
@@ -310,7 +335,7 @@ body{margin:0;user-select:none;-webkit-user-select:none}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
         </button>
       </div>
-      <input type="file" id="fileIn" accept="image/*" multiple hidden>
+      <input type="file" id="fileIn" accept="image/*,.pdf,.txt,.md,.csv,.tsv,.json,.xml,.html,.htm,.log,.docx,.docm,.xlsx,.xlsm,.xls,.ods,.odt,.odp,.pptx,.rtf,.doc,.ppt,.py,.js,.ts,.cs,.java,.kt,.cpp,.c,.h,.lua,.sql,.php,.go,.rs,.yml,.yaml,.ini,.srt,text/*,application/pdf" multiple hidden>
     </div>
   </section>
 
@@ -757,6 +782,15 @@ if (isApp) {
   hostSend({ type:"ready" });
   syncTheme();
 }
+
+// Подсказка «добавь на экран Домой» — только на iPhone/iPad в Safari, не в установленном приложении
+(function(){
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const standalone = navigator.standalone || matchMedia("(display-mode: standalone)").matches;
+  let hidden = false; try { hidden = localStorage.getItem("tango-ios-hint") === "0"; } catch(e) {}
+  if (ios && !standalone && !isApp && !hidden) $("iosHint").hidden = false;
+  $("iosHintX").onclick = () => { $("iosHint").hidden = true; try { localStorage.setItem("tango-ios-hint", "0"); } catch(e) {} };
+})();
 
 show("study");
 </script>
