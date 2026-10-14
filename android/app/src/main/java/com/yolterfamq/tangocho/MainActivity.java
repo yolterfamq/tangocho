@@ -15,6 +15,8 @@ import android.provider.Settings;
 import android.view.View;
 import android.view.Window;
 import android.webkit.JavascriptInterface;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -35,6 +37,10 @@ public class MainActivity extends Activity {
     private SharedPreferences prefs;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor();
+
+    private static final int PICK_FILES = 41;
+    private ValueCallback<Uri[]> fileCallback;
+    private String pendingGoogleToken;
 
     private Updater.Release release;
     private boolean busy, webReady, waitingForPermission;
@@ -68,7 +74,8 @@ public class MainActivity extends Activity {
                 try {
                     InputStream in = getAssets().open(path);
                     String mime = path.endsWith(".html") ? "text/html" : path.endsWith(".js") ? "text/javascript"
-                            : path.endsWith(".css") ? "text/css" : "application/octet-stream";
+                            : path.endsWith(".css") ? "text/css" : path.endsWith(".png") ? "image/png"
+                            : path.endsWith(".svg") ? "image/svg+xml" : "application/octet-stream";
                     return new WebResourceResponse(mime, "UTF-8", in);
                 } catch (Exception e) {
                     return new WebResourceResponse("text/plain", "UTF-8", 404, "Not found", null, null);
@@ -84,8 +91,76 @@ public class MainActivity extends Activity {
             }
         });
 
+        // Выбор фото для Ребеки (<input type="file">)
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> cb, FileChooserParams params) {
+                if (fileCallback != null) fileCallback.onReceiveValue(null);
+                fileCallback = cb;
+                Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType("image/*");
+                i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
+                try {
+                    startActivityForResult(Intent.createChooser(i, "Фото для Ребеки"), PICK_FILES);
+                } catch (ActivityNotFoundException e) {
+                    fileCallback = null;
+                    return false;
+                }
+                return true;
+            }
+        });
+
+        handleIntent(getIntent());
         if (state != null) web.restoreState(state);
         else web.loadUrl(START);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != PICK_FILES || fileCallback == null) return;
+        Uri[] result = null;
+        if (resultCode == RESULT_OK && data != null) {
+            if (data.getClipData() != null) {
+                int n = data.getClipData().getItemCount();
+                result = new Uri[n];
+                for (int k = 0; k < n; k++) result[k] = data.getClipData().getItemAt(k).getUri();
+            } else if (data.getData() != null) {
+                result = new Uri[]{data.getData()};
+            }
+        }
+        fileCallback.onReceiveValue(result);
+        fileCallback = null;
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleIntent(intent);
+    }
+
+    /** tangocho://auth?idToken=... — вернулись из браузера после входа через Google */
+    private void handleIntent(Intent intent) {
+        if (intent == null || intent.getData() == null) return;
+        Uri u = intent.getData();
+        if (!"tangocho".equals(u.getScheme()) || !"auth".equals(u.getHost())) return;
+        String token = u.getQueryParameter("idToken");
+        if (token == null || token.isEmpty()) return;
+        pendingGoogleToken = token;
+        deliverGoogleToken();
+    }
+
+    private void deliverGoogleToken() {
+        if (pendingGoogleToken == null || !webReady) return;
+        try {
+            JSONObject m = new JSONObject();
+            m.put("type", "googleToken");
+            m.put("idToken", pendingGoogleToken);
+            send(m);
+            pendingGoogleToken = null;
+        } catch (Exception ignored) { }
     }
 
     @Override
@@ -170,6 +245,7 @@ public class MainActivity extends Activity {
                     info.put("justUpdated", justUpdated);
                     send(info);
                 } catch (Exception ignored) { }
+                deliverGoogleToken();
                 if (Updater.pendingVersion(this) != null) sendStatus("ready", null);
                 else if (Updater.enabled() && prefs.getBoolean("auto", true)) check(true, true);
                 else sendStatus("idle", null);
@@ -181,6 +257,7 @@ public class MainActivity extends Activity {
             case "auto": prefs.edit().putBoolean("auto", m.optBoolean("value", true)).apply(); break;
             case "theme": setBars(m.optBoolean("dark", true)); break;
             case "open": openUrl(m.optString("url")); break;
+            case "googleLogin": openUrl(m.optString("url") + "?return=" + Uri.encode("tangocho://auth")); break;
         }
     }
 

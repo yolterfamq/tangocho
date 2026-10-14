@@ -24,6 +24,11 @@ git rev-parse "v%VER%" >nul 2>&1 && (
 
 powershell -NoProfile -Command "(Get-Content Tangocho.csproj -Raw -Encoding UTF8) -replace '<Version>[^<]*</Version>', '<Version>%VER%</Version>' | Set-Content Tangocho.csproj -Encoding UTF8 -NoNewline"
 
+rem Разовая настройка: публикация сайта на GitHub Pages
+if not exist ".github\workflows\pages.yml" if exist "tools\pages.yml" copy /y "tools\pages.yml" ".github\workflows\pages.yml" >nul
+rem Собранные программы не храним в репозитории (они лежат в Releases)
+git rm -r --cached --quiet --ignore-unmatch -- "*.exe" "*.apk" >nul 2>&1
+
 git add -A
 git commit -m "Версия %VER%" || echo Нет новых изменений, ставлю только тег.
 git push -u origin HEAD

@@ -4,6 +4,10 @@ out/
 .vs/
 *.user
 
+# Собранные программы и установщики не храним в репозитории (exe лежит в Releases)
+*.exe
+*.apk
+
 # Android
 android/.gradle/
 android/build/

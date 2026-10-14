@@ -1,0 +1,15 @@
+# Нужен только если деплоишь через командную строку (npx wrangler deploy).
+# Через сайт Cloudflare этот файл не нужен.
+name = "rebecca"
+main = "worker.js"
+compatibility_date = "2025-06-01"
+
+# Запросы к Claude пойдут из дата-центра рядом с серверами Anthropic,
+# а не из ближайшего к пользователю
+[placement]
+mode = "smart"
+
+[vars]
+FIREBASE_PROJECT_ID = ""
+ALLOWED_EMAILS = ""
+# Секрет добавляется отдельно:  npx wrangler secret put ANTHROPIC_API_KEY

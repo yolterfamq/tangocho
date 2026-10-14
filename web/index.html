@@ -158,6 +158,89 @@ body{margin:0;user-select:none;-webkit-user-select:none}
 .toggle{display:flex;align-items:center;gap:10px;font-size:15px;cursor:pointer}
 .toggle input{width:18px;height:18px;accent-color:var(--accent)}
 
+/* ── account ── */
+.acc-card{display:flex;flex-direction:column;gap:10px}
+.acc-who{display:flex;align-items:center;gap:12px}
+.avatar{width:40px;height:40px;border-radius:50%;background:var(--accent);color:var(--surface);display:grid;place-items:center;font-weight:600;flex:none;overflow:hidden}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.acc-who div{min-width:0}
+.acc-who b{display:block;overflow-wrap:anywhere}
+.sync{font-size:14px;color:var(--muted)}
+.sync.ok{color:var(--good)} .sync.err{color:var(--again)}
+.form{display:flex;flex-direction:column;gap:8px;max-width:360px}
+.form input{padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg);font:inherit;width:100%}
+.linkbtn{color:var(--accent);font-size:14px;align-self:flex-start;padding:2px 0}
+.msg-err{color:var(--again);font-size:14px}
+.msg-ok{color:var(--good);font-size:14px}
+.gbtn{display:inline-flex;align-items:center;gap:10px}
+.gbtn svg{width:18px;height:18px}
+
+/* ── Ребека ── */
+.chatv{flex:1;min-height:0;display:flex;flex-direction:column}
+.chat-head{display:flex;align-items:center;gap:8px;padding-block:6px 8px;border-bottom:1px solid var(--line)}
+.chat-title{flex:1;min-width:0;display:flex;align-items:baseline;gap:8px}
+.chat-title b{font-size:17px;font-weight:600}
+.chat-title span{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn.sm{padding:7px 11px;font-size:14px}
+.msgs{flex:1;min-height:0;overflow-y:auto;padding-block:14px;display:flex;flex-direction:column;gap:16px;user-select:text;-webkit-user-select:text}
+.m{max-width:100%;min-width:0;line-height:1.55;font-size:16px}
+.m.user{align-self:flex-end;max-width:85%;background:var(--surface);border:1px solid var(--line);border-radius:16px 16px 4px 16px;padding:10px 13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.m.bot .who{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:4px}
+.m.bot .body{overflow-wrap:anywhere}
+.m.bot .body>*:first-child{margin-top:0}
+.m.bot .body>*:last-child{margin-bottom:0}
+.m.bot .body p{margin:.5em 0}
+.m.bot .body ul,.m.bot .body ol{padding-left:1.3em;margin:.5em 0}
+.m.bot .body pre{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;overflow-x:auto;font-size:14px}
+.m.bot .body code{font-family:ui-monospace,Consolas,monospace;font-size:.92em}
+.m.bot .body table{border-collapse:collapse;display:block;overflow-x:auto;font-size:15px}
+.m.bot .body th,.m.bot .body td{border:1px solid var(--line);padding:5px 8px}
+.m.bot .body blockquote{margin:.5em 0;padding-left:10px;border-left:2px solid var(--line);color:var(--muted)}
+.m.bot .body .katex-display{overflow-x:auto;overflow-y:hidden;padding-block:4px}
+.m.bot .err{color:var(--again)}
+.m .imgs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.m .imgs img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.m .imgs .ph{font-size:13px;color:var(--muted)}
+.m .tools{display:flex;gap:4px;margin-top:6px}
+.m .tools button{font-size:13px;color:var(--muted);padding:4px 8px;border-radius:8px}
+.m .tools button:hover{background:var(--line);color:var(--fg)}
+.typing{display:inline-flex;gap:4px;padding:4px 0}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--muted);opacity:.4}
+@media (prefers-reduced-motion:no-preference){
+  .typing i{animation:blink 1.2s infinite}
+  .typing i:nth-child(2){animation-delay:.2s} .typing i:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+}
+.hello{margin:auto 0;padding-block:20px;display:flex;flex-direction:column;gap:14px}
+.hello .jp{font-family:var(--jp);font-size:30px;color:var(--accent)}
+.hello b{font-size:20px;font-weight:600}
+.hello p{margin:0;color:var(--muted);line-height:1.55;max-width:46ch}
+.sugg{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+.sugg button{text-align:left;padding:11px 13px;border:1px solid var(--line);border-radius:12px;background:var(--surface);font-size:15px;line-height:1.35}
+.sugg button small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.composer{border-top:1px solid var(--line);padding-block:10px calc(10px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px}
+.atts{display:flex;gap:8px;flex-wrap:wrap}
+.atts:empty,.chips:empty{display:none}
+.att{position:relative;width:64px;height:64px}
+.att img{width:100%;height:100%;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.att button{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--fg);color:var(--bg);font-size:14px;line-height:1}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{padding:6px 11px;border:1px solid var(--accent);color:var(--accent);border-radius:999px;font-size:14px}
+.crow{display:flex;align-items:flex-end;gap:6px}
+.crow textarea{flex:1;min-width:0;resize:none;max-height:160px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--fg);font:inherit;line-height:1.4;user-select:text;-webkit-user-select:text}
+.send{width:44px;height:44px;border-radius:12px;background:var(--accent);color:var(--surface);display:grid;place-items:center;flex:none}
+.send:disabled{opacity:.4;cursor:default}
+.send svg{width:20px;height:20px}
+.chat-list{flex:1;min-height:0;overflow:auto;padding-block:8px}
+.chat-list button{display:block;width:100%;text-align:left;padding:12px 4px;border-bottom:1px solid var(--line)}
+.chat-list button b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-list button small{color:var(--muted)}
+.chat-list .del{float:right;color:var(--muted);font-size:13px;padding:0 4px}
+.gate{margin:auto 0;padding-block:24px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.gate b{font-size:19px;font-weight:600}
+.gate p{margin:0;color:var(--muted);line-height:1.55;max-width:44ch}
+.dropping .msgs{outline:2px dashed var(--accent);outline-offset:-6px;border-radius:12px}
+
 @media (prefers-reduced-motion:no-preference){
   .reveal{animation:in .18s ease-out}
   @keyframes in{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -172,6 +255,9 @@ body{margin:0;user-select:none;-webkit-user-select:none}
     <div class="brand"><b>Урок 4</b><span>だい４か</span></div>
     <button class="icon" id="undoBtn" aria-label="Отменить последний ответ" title="Отменить (Z)" disabled>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+    </button>
+    <button class="icon" id="chatBtn" aria-label="Ребека — помощник" title="Ребека">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M12 8.5l.9 2 2 .9-2 .9-.9 2-.9-2-2-.9 2-.9z" fill="currentColor" stroke-width="1"/></svg>
     </button>
     <button class="icon" id="listBtn" aria-label="Список слов" title="Список слов">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
@@ -201,6 +287,33 @@ body{margin:0;user-select:none;-webkit-user-select:none}
     <div class="bar" id="bar"></div>
   </section>
 
+  <!-- Ребека -->
+  <section class="chatv" id="chatView" hidden>
+    <div class="chat-head">
+      <button class="icon" id="chatsBtn" aria-label="Все чаты" title="Все чаты">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      </button>
+      <div class="chat-title"><b>Ребека</b><span id="chatSub">репетитор</span></div>
+      <button class="btn sm" id="newChatBtn">Новый чат</button>
+    </div>
+    <div class="chat-list" id="chatList" hidden></div>
+    <div class="msgs" id="msgs"></div>
+    <div class="composer" id="composer">
+      <div class="atts" id="atts"></div>
+      <div class="chips" id="chips"></div>
+      <div class="crow">
+        <button class="icon" id="attachBtn" aria-label="Прикрепить фото" title="Прикрепить фото">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-8 8"/></svg>
+        </button>
+        <textarea id="chatInput" rows="1" placeholder="Спроси Ребеку…"></textarea>
+        <button class="send" id="sendBtn" aria-label="Отправить" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        </button>
+      </div>
+      <input type="file" id="fileIn" accept="image/*" multiple hidden>
+    </div>
+  </section>
+
   <!-- list -->
   <section class="sheet" id="listView" hidden>
     <h2>Слова урока</h2>
@@ -210,6 +323,10 @@ body{margin:0;user-select:none;-webkit-user-select:none}
   <!-- settings -->
   <section class="sheet" id="setView" hidden>
     <h2>Настройки</h2>
+    <div class="field" id="accField">
+      <span class="lbl">Аккаунт</span>
+      <div id="accBox"><span class="hint">Загрузка…</span></div>
+    </div>
     <div class="field">
       <span class="lbl">Направление</span>
       <div class="seg" id="dirSeg">
@@ -237,7 +354,7 @@ body{margin:0;user-select:none;-webkit-user-select:none}
     </div>
     <div class="field">
       <span class="lbl">Прогресс</span>
-      <span class="hint">Прогресс хранится на этом устройстве и сохраняется при обновлениях.</span>
+      <span class="hint" id="progHint">Прогресс хранится на этом устройстве. Войди в аккаунт, чтобы он был одинаковым на ПК, телефоне и сайте.</span>
       <button class="danger" id="resetBtn">Сбросить прогресс</button>
       <div class="confirm" id="resetConfirm" hidden>
         <span>Удалить весь прогресс?</span>
@@ -313,9 +430,51 @@ const KEY = "tango-l4-v1", MIN = 60000, DAY = 86400000, AHEAD = 20 * MIN;
 const $ = id => document.getElementById(id);
 const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-let S = { cards:{}, day:"", newToday:0, dir:"both", newPerDay:20 };
+// cards: id → карточка (t — когда последний раз менялась), tomb: id → когда карточку «откатили» в новые
+// setAt — когда меняли настройки, resetAt — когда сбрасывали прогресс. По этим меткам сливаем устройства.
+let S = { cards:{}, tomb:{}, day:"", newToday:0, dir:"both", newPerDay:20, setAt:0, resetAt:0 };
 try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(S, JSON.parse(raw)); } catch(e) {}
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} };
+if (!S.tomb) S.tomb = {};
+const syncHooks = [];               // account.js подписывается сюда, чтобы отправлять прогресс в облако
+const save = () => {
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {}
+  syncHooks.forEach(f => { try { f(S); } catch(e) {} });
+};
+
+/** Слияние прогресса двух устройств: по каждой карточке побеждает более свежая правка */
+function mergeState(a, b){
+  if (!b) return a;
+  const R = Math.max(a.resetAt || 0, b.resetAt || 0);
+  const out = { ...a, cards:{}, tomb:{}, resetAt:R };
+  const ids = new Set([...Object.keys(a.cards||{}), ...Object.keys(b.cards||{}), ...Object.keys(a.tomb||{}), ...Object.keys(b.tomb||{})]);
+  for (const id of ids) {
+    const ca = a.cards?.[id], cb = b.cards?.[id];
+    let c = !ca ? cb : !cb ? ca : ((cb.t||0) > (ca.t||0) ? cb : ca);
+    const tomb = Math.max(a.tomb?.[id] || 0, b.tomb?.[id] || 0);
+    if (c && ((c.t||0) < R || (c.t||0) < tomb)) c = null;
+    if (c) out.cards[id] = c;
+    else if (tomb > R) out.tomb[id] = tomb;
+  }
+  if ((b.setAt||0) > (a.setAt||0)) { out.dir = b.dir; out.newPerDay = b.newPerDay; out.setAt = b.setAt; }
+  const t = today();
+  const na = a.day === t ? a.newToday : 0, nb = b.day === t ? b.newToday : 0;
+  out.day = t; out.newToday = Math.max(na, nb);
+  if ((b.resetAt||0) > (a.resetAt||0) && b.day === t) out.newToday = nb;
+  return out;
+}
+/** Применить прогресс, пришедший с другого устройства */
+function applyState(next){
+  const before = JSON.stringify(S);
+  S = next; if (!S.tomb) S.tomb = {};
+  if (JSON.stringify(S) === before) return false;
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {}
+  history = [];
+  if (cur && !activeIds().includes(cur)) cur = null;
+  if (view === "study") { if (!cur) cur = pick(); render(); }
+  else if (view === "list") renderList();
+  else if (view === "set") renderSettings();
+  return true;
+}
 
 const today = () => { const d = new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); };
 const endOfDay = () => { const d = new Date(); d.setHours(23,59,59,999); return d.getTime(); };
@@ -430,24 +589,29 @@ function answer(g){
   history.push({ id:cur, prev, newToday:S.newToday });
   if (history.length > 50) history.shift();
   if (!prev) S.newToday++;
-  S.cards[cur] = schedule(prev, g, Date.now());
+  S.cards[cur] = { ...schedule(prev, g, Date.now()), t: Date.now() };
   save();
   cur = pick(); shown = false; render();
 }
 function undo(){
   const h = history.pop(); if (!h) return;
-  if (h.prev) S.cards[h.id] = h.prev; else delete S.cards[h.id];
+  if (h.prev) S.cards[h.id] = { ...h.prev, t: Date.now() };
+  else { delete S.cards[h.id]; S.tomb[h.id] = Date.now(); }
   S.newToday = h.newToday; save();
   cur = h.id; shown = false; show("study"); render();
 }
 
 // views
 let view = "study";
+const viewHooks = [];
 function show(v){
   view = v;
   $("study").hidden = false; $("study").style.display = v === "study" ? "contents" : "none";
-  $("listView").hidden = v !== "list"; $("setView").hidden = v !== "set";
+  $("listView").hidden = v !== "list"; $("setView").hidden = v !== "set"; $("chatView").hidden = v !== "chat";
+  $("undoBtn").hidden = v === "chat";
   $("listBtn").setAttribute("aria-pressed", v === "list"); $("setBtn").setAttribute("aria-pressed", v === "set");
+  $("chatBtn").setAttribute("aria-pressed", v === "chat");
+  viewHooks.forEach(f => { try { f(v); } catch(e) {} });
   if (v === "list") renderList();
   if (v === "set") renderSettings();
   if (v === "study") { if (!cur) cur = pick(); render(); }
@@ -468,15 +632,17 @@ function renderSettings(){
   $("dirSeg").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.dataset.dir === S.dir));
   $("newPerDay").value = S.newPerDay;
   $("resetConfirm").hidden = true; $("resetBtn").hidden = false;
+  if (window.Account) Account.render();
 }
-$("dirSeg").onclick = e => { const b = e.target.closest("[data-dir]"); if (!b) return; S.dir = b.dataset.dir; save(); cur = null; renderSettings(); };
-$("newPerDay").onchange = e => { const v = Math.max(1, Math.min(200, Math.round(+e.target.value || 20))); S.newPerDay = v; e.target.value = v; save(); cur = null; };
+$("dirSeg").onclick = e => { const b = e.target.closest("[data-dir]"); if (!b) return; S.dir = b.dataset.dir; S.setAt = Date.now(); save(); cur = null; renderSettings(); };
+$("newPerDay").onchange = e => { const v = Math.max(1, Math.min(200, Math.round(+e.target.value || 20))); S.newPerDay = v; S.setAt = Date.now(); e.target.value = v; save(); cur = null; };
 $("resetBtn").onclick = () => { $("resetConfirm").hidden = false; $("resetBtn").hidden = true; };
 $("resetNo").onclick = renderSettings;
-$("resetYes").onclick = () => { S.cards = {}; S.newToday = 0; history = []; cur = null; save(); show("study"); };
+$("resetYes").onclick = () => { S.cards = {}; S.tomb = {}; S.newToday = 0; S.resetAt = Date.now(); history = []; cur = null; save(); show("study"); };
 
 $("listBtn").onclick = () => show(view === "list" ? "study" : "list");
 $("setBtn").onclick  = () => show(view === "set" ? "study" : "set");
+$("chatBtn").onclick = () => show(view === "chat" ? "study" : "chat");
 $("undoBtn").onclick = undo;
 $("stage").onclick = () => { if (cur && !shown) reveal(); };
 
@@ -496,7 +662,7 @@ function syncTheme(){
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncTheme);
 
 document.addEventListener("keydown", e => {
-  if (e.target.tagName === "INPUT" || view !== "study") return;
+  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || view !== "study") return;
   if ((e.key === " " || e.key === "Enter") && !shown) { e.preventDefault(); reveal(); }
   else if (shown && "1234".includes(e.key) && e.key) answer(+e.key);
   else if (e.key === "z" || e.key === "я") undo();
@@ -559,6 +725,9 @@ function onHost(m){
       $("updAuto").checked = !!m.auto; $("updAuto").disabled = !m.enabled;
       $("updField").hidden = false;
       if (!m.enabled) U.state = "disabled";
+    } else if (m.type === "googleToken" || m.type === "googleError") {
+      if (window.Account) Account.onHost(m);
+      return;
     } else if (m.type === "status") {
       U.state = m.state;
       if (m.version) U.newVer = m.version;
@@ -571,7 +740,11 @@ function onHost(m){
 }
 window.__host = onHost;
 // Кнопка «Назад» на Android: сначала закрываем список/настройки
-window.__hostBack = () => { if (view !== "study") { show("study"); return true; } return false; };
+window.__hostBack = () => {
+  if (view === "chat" && window.Rebecca && Rebecca.back()) return true;
+  if (view !== "study") { show("study"); return true; }
+  return false;
+};
 
 if (isApp) {
   if (wv) wv.addEventListener("message", e => onHost(e.data));
@@ -580,13 +753,16 @@ if (isApp) {
   $("bannerGo").onclick = e => hostSend({ type: e.currentTarget.dataset.do });
   $("bannerX").onclick = () => { U.bannerHidden = true; U.justUpdated = false; renderUpdates(); };
   $("updAuto").onchange = e => hostSend({ type:"auto", value: e.target.checked });
-  document.addEventListener("contextmenu", e => e.preventDefault());
+  document.addEventListener("contextmenu", e => { if (!e.target.closest(".msgs, textarea, input")) e.preventDefault(); });
   hostSend({ type:"ready" });
   syncTheme();
 }
 
 show("study");
 </script>
+<script src="config.js"></script>
+<script src="account.js"></script>
+<script src="rebecca.js"></script>
 
 </body>
 </html>

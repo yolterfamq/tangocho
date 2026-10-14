@@ -101,10 +101,17 @@ public partial class MainWindow : Window
     static void ExtractWeb()
     {
         Directory.CreateDirectory(Paths.Web);
-        using var res = Assembly.GetExecutingAssembly().GetManifestResourceStream("web.index.html")
-                        ?? throw new InvalidOperationException("Нет встроенной страницы");
-        using var file = File.Create(Path.Combine(Paths.Web, "index.html"));
-        res.CopyTo(file);
+        var asm = Assembly.GetExecutingAssembly();
+        int n = 0;
+        foreach (var name in asm.GetManifestResourceNames())
+        {
+            if (!name.StartsWith("web/")) continue;
+            using var res = asm.GetManifestResourceStream(name)!;
+            using var file = File.Create(Path.Combine(Paths.Web, name[4..]));
+            res.CopyTo(file);
+            n++;
+        }
+        if (n == 0) throw new InvalidOperationException("Нет встроенной страницы");
     }
 
     static void OpenUrl(string url)
@@ -192,7 +199,109 @@ public partial class MainWindow : Window
             case "open":
                 if (root.TryGetProperty("url", out var u)) OpenUrl(u.GetString() ?? "");
                 break;
+
+            case "googleLogin":
+                if (root.TryGetProperty("url", out var au)) _ = GoogleLoginAsync(au.GetString() ?? "");
+                break;
         }
+    }
+
+    // ───────────── Вход через Google в обычном браузере ─────────────
+    // Google не разрешает входить во встроенном окне, поэтому открываем браузер,
+    // а страница входа возвращает токен на локальный адрес 127.0.0.1, который слушает программа.
+
+    System.Net.Sockets.TcpListener? _loginListener;
+
+    async Task GoogleLoginAsync(string authPage)
+    {
+        try { _loginListener?.Stop(); } catch { }
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        _loginListener = listener;
+        try
+        {
+            listener.Start();
+            int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+            OpenUrl(authPage + "?return=" + Uri.EscapeDataString($"http://127.0.0.1:{port}/cb"));
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+            var result = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var reg = cts.Token.Register(() => result.TrySetCanceled());
+
+            // Браузер может открыть несколько соединений (в т.ч. пустых) — обслуживаем каждое отдельно
+            _ = Task.Run(async () =>
+            {
+                while (!result.Task.IsCompleted)
+                {
+                    System.Net.Sockets.TcpClient client;
+                    try { client = await listener.AcceptTcpClientAsync(cts.Token); }
+                    catch { break; }
+                    _ = Task.Run(() => HandleLoginClient(client, result));
+                }
+            });
+
+            var token = await result.Task;      // ждём на UI-потоке
+            Send(new { type = "googleToken", idToken = token });
+            BringToFront();
+        }
+        catch (OperationCanceledException)
+        {
+            if (_loginListener == listener)
+                Send(new { type = "googleError", message = "Время на вход вышло. Нажми «Войти через Google» ещё раз." });
+        }
+        catch (Exception ex)
+        {
+            if (_loginListener == listener)
+                Send(new { type = "googleError", message = "Не удалось войти: " + ex.Message });
+        }
+        finally
+        {
+            try { listener.Stop(); } catch { }
+        }
+    }
+
+    static async Task HandleLoginClient(System.Net.Sockets.TcpClient client, TaskCompletionSource<string> result)
+    {
+        using (client)
+        {
+            try
+            {
+                using var stream = client.GetStream();
+                using var readCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                var buf = new byte[16384];
+                int read = await stream.ReadAsync(buf, readCts.Token);
+                if (read <= 0) return;
+                var line = System.Text.Encoding.UTF8.GetString(buf, 0, read).Split("\r\n")[0];   // GET /cb?idToken=... HTTP/1.1
+                var parts = line.Split(' ');
+                if (parts.Length < 2 || !parts[1].StartsWith("/cb")) { await Reply(stream, 404, "Not found"); return; }
+
+                var target = parts[1];
+                var query = target.Contains('?') ? target[(target.IndexOf('?') + 1)..] : "";
+                string? token = null;
+                foreach (var kv in query.Split('&'))
+                {
+                    var i = kv.IndexOf('=');
+                    if (i > 0 && kv[..i] == "idToken") token = Uri.UnescapeDataString(kv[(i + 1)..]);
+                }
+                await Reply(stream, 200,
+                    "<!doctype html><meta charset=utf-8><title>Тангочо</title>" +
+                    "<body style=\"font:18px system-ui;background:#0c0e12;color:#e8eaf0;display:grid;place-items:center;height:100vh;margin:0\">" +
+                    "<div style=\"text-align:center\"><div style=\"font-size:44px;color:#9db1ea\">単</div>" +
+                    (token != null ? "Готово! Можно закрыть вкладку и вернуться в Тангочо." : "Вход не удался. Попробуй ещё раз.") + "</div>");
+
+                if (token != null) result.TrySetResult(token);
+                else result.TrySetException(new Exception("Google не вернул данные входа."));
+            }
+            catch { /* пустое или оборванное соединение — игнорируем */ }
+        }
+    }
+
+    static async Task Reply(System.Net.Sockets.NetworkStream stream, int code, string html)
+    {
+        var body = System.Text.Encoding.UTF8.GetBytes(html);
+        var head = System.Text.Encoding.ASCII.GetBytes(
+            $"HTTP/1.1 {code} OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n");
+        await stream.WriteAsync(head);
+        await stream.WriteAsync(body);
     }
 
     // ───────────── Обновления ─────────────
