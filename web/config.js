@@ -12,7 +12,7 @@ window.TANGOCHO_CONFIG = {
   },
 
   // Адрес сервера Ребеки на Cloudflare, например "https://rebecca.yolterfamq.workers.dev"
-  rebeccaUrl: "",
+  rebeccaUrl: "https://rebecca.lin4ik-04-04.workers.dev",
 
   // Страница входа через Google для ПК и Android (лежит на GitHub Pages)
   authPage: "https://yolterfamq.github.io/tangocho/auth.html"
