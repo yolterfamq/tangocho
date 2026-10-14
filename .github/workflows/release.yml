@@ -67,6 +67,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
+          # Кеш однажды сохранил «не найдено» для библиотек и ломал сборку — собираем начисто
+          cache-disabled: true
 
       - name: Signing key
         env:
@@ -84,7 +86,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           VER="${GITHUB_REF_NAME#v}"
-          gradle -p android assembleRelease --no-daemon \
+          gradle -p android assembleRelease --no-daemon --refresh-dependencies \
             -PappVersion="$VER" -PupdateRepo="${{ github.repository }}"
           mkdir -p out
           cp android/app/build/outputs/apk/release/app-release.apk out/Tangocho.apk
