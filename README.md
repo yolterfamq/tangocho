@@ -41,18 +41,22 @@ Android ставит обновление только поверх прилож
 4. **Build → Firestore Database → Create database** → режим *production*, регион поближе (например `eur3`). Вкладка **Rules** → вставь содержимое `firestore.rules` → **Publish**.
 5. **⚙ Project settings → Your apps → Web (`</>`)** → зарегистрируй приложение → скопируй `apiKey`, `authDomain`, `projectId`, `appId` в `web/config.js`.
 
-## Ребека: Claude + Cloudflare (один раз)
+## Ребека: бесплатные ИИ + Cloudflare (один раз)
 
-1. Ключ Claude: https://console.anthropic.com → **API Keys → Create Key**. На счёте должны быть деньги (**Billing**). Один ответ с фото стоит примерно 1–2 цента.
-2. https://dash.cloudflare.com (регистрация бесплатная) → **Workers & Pages → Create → Worker** → имя `rebecca` → **Deploy**.
-3. **Edit code** → замени весь код содержимым `rebecca-worker/worker.js` → **Deploy**.
+Ребека пробует бесплатные сервисы по очереди: если один упёрся в дневной лимит, берёт следующий.
+
+1. **Groq** (основной): https://console.groq.com → войти → **API Keys → Create API Key**. Бесплатно, без карты.
+2. **Gemini** (запасной): https://aistudio.google.com → **Get API key → Create API key**. Бесплатно.
+3. https://dash.cloudflare.com → **Workers & Pages → Create → Worker** → имя `rebecca` → **Deploy** → **Edit code** → вставь `rebecca-worker/worker.js` → **Deploy**.
 4. Воркер → **Settings → Variables and Secrets → Add**:
-   - `ANTHROPIC_API_KEY` — тип **Secret**, ключ из шага 1;
-   - `ALLOWED_EMAILS` — тип Text, почты через запятую, кому можно говорить с Ребекой: твоя и её.
-5. Воркер → **Settings → Runtime → Placement → Smart**.
+   - `GROQ_API_KEY` — Secret, ключ Groq;
+   - `GEMINI_API_KEY` — Secret, ключ Gemini;
+   - `ALLOWED_EMAILS` — Text, почты через запятую, кому можно говорить с Ребекой.
+5. Воркер → **Settings → Bindings → Add → Workers AI**, имя переменной `AI`. Это последний запасной вариант, ключ не нужен.
 6. Скопируй адрес воркера (`https://rebecca.<что-то>.workers.dev`) в `rebeccaUrl` в `web/config.js`.
 
-Модель по умолчанию — `claude-sonnet-5-5`, запасная — `claude-haiku-5-5`. Поменять можно переменными `CLAUDE_MODEL` и `CLAUDE_FALLBACK`.
+Примерные бесплатные лимиты в день: Groq — ~50 вопросов с фото и ~130 текстовых, плюс Gemini и Workers AI сверху.
+Платный Claude тоже можно подключить: переменная `ANTHROPIC_API_KEY` (он тогда идёт первым).
 
 Если входите по почте и паролю, почту нужно подтвердить: письмо приходит при регистрации. С Google-аккаунтом подтверждать ничего не нужно.
 
@@ -60,9 +64,20 @@ Android ставит обновление только поверх прилож
 
 В репозитории: **Settings → Pages → Source: GitHub Actions**. После каждого пуша, где менялась папка `web/`, сайт обновится сам.
 
+## Уроки
+
+Каждый урок лежит в своём файле в папке `web/`: `lesson-04.js`, `lesson-05.js`… Все канджи — один набор в `kanji.js`.
+
+Новый урок:
+1. Скопируй `web/lesson-05.js` в `web/lesson-06.js`. Поменяй в нём `id` (например `"l6"`), название и слова.
+2. В `web/index.html` рядом с `<script src="lesson-05.js">` добавь строку `<script src="lesson-06.js"></script>`.
+
+Новые канджи дописывай в конец `web/kanji.js`.
+Порядок уже существующих слов не меняй: прогресс привязан к номеру слова.
+
 ## Как выпустить обновление
 
-1. Поменяй что нужно, например слова в `web/index.html`.
+1. Поменяй что нужно, например добавь урок.
 2. Запусти:
    ```
    release.bat 1.0.1 "Добавил урок 5"
@@ -87,12 +102,14 @@ Android ставит обновление только поверх прилож
 
 | Файл | Что это |
 |---|---|
-| `web/index.html` | Сами карточки: слова, вид, логика повторений |
+| `web/index.html` | Карточки: вид, выбор уроков, логика повторений |
+| `web/lesson-04.js`, `web/lesson-05.js`… | Слова уроков, по файлу на урок |
+| `web/kanji.js` | Канджи: значение, くんよみ и オンヨミ |
 | `web/config.js` | Настройки Firebase и адрес Ребеки |
 | `web/account.js` | Вход и синхронизация прогресса |
 | `web/rebecca.js` | Чат с Ребекой: фото, история, формулы |
 | `web/auth.html` | Страница входа через Google для приложений |
-| `rebecca-worker/worker.js` | Сервер Ребеки для Cloudflare (ключ Claude хранится там) |
+| `rebecca-worker/worker.js` | Сервер Ребеки для Cloudflare (ключи ИИ хранятся там) |
 | `firestore.rules` | Правила базы: каждый видит только свои данные |
 | `MainWindow.xaml(.cs)` | Окно программы и связь со страницей |
 | `Updater.cs` | Проверка, скачивание и установка обновлений с GitHub |

@@ -260,6 +260,18 @@
     const b = el("gateGo"); if (b) b.onclick = () => show("set");
   }
 
+  /** «Проверь меня» по урокам, отмеченным галочками */
+  function quizButton() {
+    const ls = typeof selLessons === "function" ? selLessons() : [];
+    if (!ls.length) return "";
+    const names = ls.map(l => l.title).join(", ");
+    const list = ls.map(l => l.title + ": " + l.items.map(w => l.type === "kanji"
+      ? w[0] + " (" + w[1] + "; кун: " + (w[2] || "—") + "; он: " + (w[3] || "—") + ")"
+      : (w[1] ? w[0] + " / " + w[1] : w[0]) + " — " + w[2]).join("; ")).join("\n");
+    const q = "Проверь меня: задай 5 вопросов по словам из " + names + ", по одному за раз, и жди мой ответ.";
+    return `<button data-q="${esc(q)}" data-ctx="${esc("Слова и канджи, по которым проверять (из учебника):\n" + list)}">Проверь меня<small>${esc(names)}</small></button>`;
+  }
+
   function hello() {
     return `<div class="hello">
       <span class="jp">こんにちは！</span>
@@ -267,7 +279,7 @@
       <p>Спроси что угодно или прикрепи фото задачи. Решу и объясню по шагам, перепишу текст с фото, проверю твоё решение.</p>
       <div class="sugg">
         <button data-q="Объясни простыми словами разницу между ～から и ～まで и дай 3 примера.">Объясни грамматику<small>～から и ～まで с примерами</small></button>
-        <button data-q="Проверь меня: задай 5 вопросов по словам урока 4 (дни недели и время), по одному за раз.">Проверь меня<small>вопросы по уроку 4</small></button>
+        ${quizButton()}
         <button data-photo="1">Решить задачу по фото<small>сфоткай и отправь</small></button>
         <button data-q="Как лучше запоминать кандзи? Дай короткий план на неделю.">Совет по учёбе<small>как запоминать кандзи</small></button>
       </div>
@@ -288,7 +300,7 @@
     if (g) { renderGate(g); return; }
     el("composer").hidden = false;
     box.innerHTML = !chat || !chat.msgs.length ? hello() : chat.msgs.map(msgHtml).join("");
-    box.querySelectorAll("[data-q]").forEach(b => b.onclick = () => send(b.dataset.q));
+    box.querySelectorAll("[data-q]").forEach(b => b.onclick = () => send(b.dataset.q, b.dataset.ctx));
     box.querySelectorAll("[data-photo]").forEach(b => b.onclick = () => el("fileIn").click());
     box.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => copy(chat.msgs[+b.dataset.copy].text, b));
     if (scroll) box.scrollTop = box.scrollHeight;
@@ -350,7 +362,8 @@
     too_big: "Файлы слишком большие. Отправь поменьше или по одному.",
   };
 
-  async function send(text) {
+  /** ctx — скрытый текст для Ребеки (например, список слов урока); в чате не показывается */
+  async function send(text, ctx) {
     text = (text || "").trim();
     if (atts.some(a => a.kind === "loading")) return;
     if (streaming || (!text && !atts.length)) return;
@@ -360,7 +373,7 @@
 
     const images = imgs.map(a => ({ mime: a.mime, data: a.data }));
     const userMsg = { role: "user", text, thumbs: imgs.map(a => a.thumb),
-      files: docs.map(d => ({ name: d.name, ext: d.ext })), docText: docs.length ? docsBlock(docs) : "" };
+      files: docs.map(d => ({ name: d.name, ext: d.ext })), docText: docs.length ? docsBlock(docs) : (ctx || "") };
     chat.msgs = chat.msgs.filter(m => !m.error);
     chat.msgs.push(userMsg);
     if (!chat.title) chat.title = docs.length && text.startsWith("Прочитай файл") ? docs[0].name : (text.length > 48 ? text.slice(0, 46) + "…" : text);
@@ -423,7 +436,7 @@
     // в облако сохраняем без ошибок и без пустых ответов
     const keep = chat.msgs.filter(m => !m.error && !m.pending);
     const saved = { ...chat, msgs: keep.map(m => ({ role: m.role, text: m.text || "", thumbs: m.thumbs || [],
-      ...(m.files && m.files.length ? { files: m.files, docText: (m.docText || "").slice(0, MAX_DOC_CHARS + 2000) } : {}) })) };
+      ...((m.files && m.files.length) || m.docText ? { files: m.files || [], docText: (m.docText || "").slice(0, MAX_DOC_CHARS + 2000) } : {}) })) };
     if (Account.user) col().doc(chat.id).set({ ...saved, updated: Date.now() }).catch(e => console.warn(e));
   }
 

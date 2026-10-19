@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Тангочо · Урок 4</title>
+<title>Тангочо</title>
 <!-- Приложение на экране «Домой» (iPhone / Android через браузер) -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -47,7 +47,12 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .ios-hint span{flex:1;min-width:0}
 .ios-hint svg{width:16px;height:16px;vertical-align:-3px}
 .top{display:flex;align-items:center;gap:8px;padding-block:14px 6px}
-.brand{display:flex;align-items:baseline;gap:10px;flex:1;min-width:0}
+.brand{display:flex;align-items:baseline;gap:10px;flex:1;min-width:0;text-align:left;padding:6px 8px;margin-left:-8px;border-radius:10px}
+.brand:hover,.brand[aria-pressed="true"]{background:var(--line)}
+.brand b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.brand #brandJp{white-space:nowrap;overflow:hidden;min-width:0;flex-shrink:100}
+@media (max-width:560px){.brand #brandJp{display:none}}
+.brand .chev{width:16px;height:16px;align-self:center;color:var(--muted);flex:none}
 .brand b{font-weight:600;font-size:17px}
 .brand span{font-family:var(--jp);color:var(--muted);font-size:15px}
 .icon{width:40px;height:40px;display:grid;place-items:center;border-radius:10px;color:var(--fg)}
@@ -68,6 +73,24 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .ru.front{font-size:clamp(24px,6.5vw,32px);font-weight:500}
 .note{display:block;font-size:15px;color:var(--muted);margin-top:8px}
 hr{border:0;border-top:1px solid var(--line);margin:22px 0}
+.kj-big{font-family:var(--jp);font-weight:600;font-size:clamp(84px,24vw,128px);line-height:1.15}
+.reads{display:grid;grid-template-columns:auto 1fr;gap:10px 14px;max-width:340px;margin:18px auto 0;text-align:left;align-items:baseline}
+.reads span{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.reads b{font-family:var(--jp);font-weight:600;font-size:clamp(20px,5.5vw,24px);overflow-wrap:anywhere}
+/* lessons */
+.lessons{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.lesson{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);cursor:pointer}
+.lesson input{width:20px;height:20px;accent-color:var(--accent);flex:none}
+.lesson .ln{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.lesson .ln b{font-weight:600}
+.lesson .ln b i{font-style:normal;font-family:var(--jp);color:var(--muted);font-weight:400;margin-left:8px}
+.lesson .ln small{font-size:13px;color:var(--muted)}
+.lesson .lc{display:flex;gap:10px;font-variant-numeric:tabular-nums;font-size:15px}
+.lesson:has(input:checked){border-color:var(--accent)}
+.lh{font-size:15px;font-weight:600;color:var(--muted);margin:22px 0 4px}
+.lh:first-child{margin-top:0}
+.list .kjl{font-family:var(--jp);font-size:30px;font-weight:600;line-height:1}
+.list .rd{font-family:var(--jp);font-size:14px;color:var(--muted)}
 
 .done{padding-top:12vh;color:var(--muted);line-height:1.6}
 .done b{display:block;color:var(--fg);font-size:22px;font-weight:600;margin-bottom:6px}
@@ -272,7 +295,7 @@ body{margin:0;user-select:none;-webkit-user-select:none}
 
 <div class="app">
   <div class="top">
-    <div class="brand"><b>Урок 4</b><span>だい４か</span></div>
+    <button class="brand" id="brandBtn" aria-label="Выбрать уроки" title="Выбрать уроки"><b id="brandTitle">Тангочо</b><span id="brandJp"></span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
     <button class="icon" id="undoBtn" aria-label="Отменить последний ответ" title="Отменить (Z)" disabled>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
     </button>
@@ -339,10 +362,17 @@ body{margin:0;user-select:none;-webkit-user-select:none}
     </div>
   </section>
 
+  <!-- lessons -->
+  <section class="sheet" id="lessonsView" hidden>
+    <h2>Уроки</h2>
+    <p class="hint">Отметь, что учить. Можно один урок или несколько сразу — карточки отмеченных уроков идут вперемешку по расписанию.</p>
+    <div class="lessons" id="lessonsBody"></div>
+  </section>
+
   <!-- list -->
   <section class="sheet" id="listView" hidden>
-    <h2>Слова урока</h2>
-    <div class="tablewrap"><table class="list"><tbody id="listBody"></tbody></table></div>
+    <h2>Слова</h2>
+    <div id="listBody"></div>
   </section>
 
   <!-- settings -->
@@ -353,7 +383,7 @@ body{margin:0;user-select:none;-webkit-user-select:none}
       <div id="accBox"><span class="hint">Загрузка…</span></div>
     </div>
     <div class="field">
-      <span class="lbl">Направление</span>
+      <span class="lbl">Направление (для слов)</span>
       <div class="seg" id="dirSeg">
         <button data-dir="both">Оба</button>
         <button data-dir="jr">日本語 → рус</button>
@@ -363,7 +393,7 @@ body{margin:0;user-select:none;-webkit-user-select:none}
     <div class="field">
       <label for="newPerDay">Новых карточек в день</label>
       <input type="number" id="newPerDay" min="1" max="200" step="1">
-      <span class="hint">Сначала идут карточки «японский → русский», затем обратные.</span>
+      <span class="hint">Новые карточки берутся по порядку уроков: сначала «японский → русский», затем обратные. Канджи всегда: канджи → значение и чтения.</span>
     </div>
     <div class="field" id="updField" hidden>
       <span class="lbl">Обновления</span>
@@ -390,76 +420,49 @@ body{margin:0;user-select:none;-webkit-user-select:none}
   </section>
 </div>
 
+<!-- Уроки: каждый в своём файле. Новый урок = новый файл + строка здесь -->
+<script src="lesson-04.js"></script>
+<script src="lesson-05.js"></script>
+<script src="kanji.js"></script>
 <script>
 // [хирагана/катакана, кандзи (только из учебника), перевод, пояснение]
-const WORDS = [
-  ["おきます","起きます","вставать, просыпаться"],
-  ["ねます","寝ます","ложиться спать, спать, пребывать в покое"],
-  ["はたらきます","働きます","работать"],
-  ["やすみます","休みます","отдыхать, брать отпуск"],
-  ["べんきょうします","勉強します","заниматься, учиться"],
-  ["おわります","終わります","заканчивать, заканчиваться"],
-  ["デパート","","универмаг"],
-  ["ぎんこう","銀行","банк"],
-  ["ゆうびんきょく","郵便局","почта, почтовое отделение"],
-  ["としょかん","図書館","библиотека"],
-  ["びじゅつかん","美術館","художественный музей"],
-  ["いま","今","сейчас"],
-  ["～じ","～時","– часов"],
-  ["～ふん（～ぷん）","～分","– минут"],
-  ["はん","半","половина","например: половина седьмого"],
-  ["なんじ","何時","сколько времени"],
-  ["なんぷん","何分","сколько минут"],
-  ["ごぜん","午前","первая половина дня"],
-  ["ごご","午後","вторая половина дня"],
-  ["あさ","朝","утро"],
-  ["ひる","昼","день"],
-  ["ばん（よる）","晩（夜）","вечер (поздний вечер)"],
-  ["おととい","","позавчера"],
-  ["きのう","","вчера"],
-  ["きょう","","сегодня"],
-  ["あした","","завтра"],
-  ["あさって","","послезавтра"],
-  ["けさ","","сегодня утром"],
-  ["こんばん","今晩","сегодня вечером"],
-  ["やすみ","休み","выходной день, праздничный день; отдых, перерыв"],
-  ["ひるやすみ","昼休み","обеденный перерыв"],
-  ["しけん","試験","экзамен"],
-  ["かいぎ","会議","собрание, заседание, совещание","～を します: проводить собрание, устраивать совещание"],
-  ["えいが","映画","кинофильм"],
-  ["まいあさ","毎朝","каждое утро"],
-  ["まいばん","毎晩","каждый вечер"],
-  ["まいにち","毎日","каждый день"],
-  ["げつようび","月曜日","понедельник"],
-  ["かようび","火曜日","вторник"],
-  ["すいようび","水曜日","среда"],
-  ["もくようび","木曜日","четверг"],
-  ["きんようび","金曜日","пятница"],
-  ["どようび","土曜日","суббота"],
-  ["にちようび","日曜日","воскресенье"],
-  ["なんようび","何曜日","какой день недели"],
-  ["～から","","с ～"],
-  ["～まで","","до ～"],
-  ["～と ～","","и","соединительная частица для связи однородных именных членов предложения"],
-  ["たいへんですね","大変ですね","Да, ужасно.","выражение сочувствия"],
-  ["ばんごう","番号","номер (телефона, квартиры и т.п.)"],
-  ["なんばん","何番","какой номер"],
-  ["そちら","","у вас","у собеседника, при звонке в универмаг, музей, фирму и т.п."],
-  ["ニューヨーク","","Нью-Йорк"],
-  ["ペキン","北京","Пекин"],
-  ["ロサンゼルス","","Лос-Анджелес"],
-  ["ロンドン","","Лондон"],
-];
+// Слова лежат в отдельных файлах: lesson-04.js, lesson-05.js, …, kanji.js (подключены выше)
 
+
+const LESSONS = window.LESSONS || [];
+const LBY = Object.fromEntries(LESSONS.map(l => [l.id, l]));
+const isKanji = l => l && l.type === "kanji";
+
+// Имя ключа осталось с первой версии (тогда был только урок 4) — не менять, иначе потеряется прогресс
 const KEY = "tango-l4-v1", MIN = 60000, DAY = 86400000, AHEAD = 20 * MIN;
 const $ = id => document.getElementById(id);
 const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 // cards: id → карточка (t — когда последний раз менялась), tomb: id → когда карточку «откатили» в новые
 // setAt — когда меняли настройки, resetAt — когда сбрасывали прогресс. По этим меткам сливаем устройства.
-let S = { cards:{}, tomb:{}, day:"", newToday:0, dir:"both", newPerDay:20, setAt:0, resetAt:0 };
+// off — уроки, с которых сняли галочку (новые уроки по умолчанию включены)
+let S = { cards:{}, tomb:{}, day:"", newToday:0, dir:"both", newPerDay:20, setAt:0, resetAt:0, off:[] };
+
+/** До версии с уроками карточки назывались «12-jr» (только урок 4). Теперь «l4:12-jr». */
+function migrateIds(st){
+  if (!st) return st;
+  const old = /^\d+-(jr|rj)$/;
+  for (const id of Object.keys(st.cards || {})) if (old.test(id)) {
+    const n = "l4:" + id, a = st.cards[id], b = st.cards[n];
+    if (!b || (a.t||0) > (b.t||0)) st.cards[n] = a;
+    delete st.cards[id];
+  }
+  for (const id of Object.keys(st.tomb || {})) if (old.test(id)) {
+    const n = "l4:" + id;
+    st.tomb[n] = Math.max(st.tomb[n] || 0, st.tomb[id]);
+    delete st.tomb[id];
+  }
+  return st;
+}
 try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(S, JSON.parse(raw)); } catch(e) {}
 if (!S.tomb) S.tomb = {};
+if (!Array.isArray(S.off)) S.off = [];
+migrateIds(S);
 const syncHooks = [];               // account.js подписывается сюда, чтобы отправлять прогресс в облако
 const save = () => {
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {}
@@ -469,6 +472,7 @@ const save = () => {
 /** Слияние прогресса двух устройств: по каждой карточке побеждает более свежая правка */
 function mergeState(a, b){
   if (!b) return a;
+  migrateIds(a); migrateIds(b);
   const R = Math.max(a.resetAt || 0, b.resetAt || 0);
   const out = { ...a, cards:{}, tomb:{}, resetAt:R };
   const ids = new Set([...Object.keys(a.cards||{}), ...Object.keys(b.cards||{}), ...Object.keys(a.tomb||{}), ...Object.keys(b.tomb||{})]);
@@ -480,7 +484,7 @@ function mergeState(a, b){
     if (c) out.cards[id] = c;
     else if (tomb > R) out.tomb[id] = tomb;
   }
-  if ((b.setAt||0) > (a.setAt||0)) { out.dir = b.dir; out.newPerDay = b.newPerDay; out.setAt = b.setAt; }
+  if ((b.setAt||0) > (a.setAt||0)) { out.dir = b.dir; out.newPerDay = b.newPerDay; out.off = Array.isArray(b.off) ? b.off : []; out.setAt = b.setAt; }
   const t = today();
   const na = a.day === t ? a.newToday : 0, nb = b.day === t ? b.newToday : 0;
   out.day = t; out.newToday = Math.max(na, nb);
@@ -490,7 +494,7 @@ function mergeState(a, b){
 /** Применить прогресс, пришедший с другого устройства */
 function applyState(next){
   const before = JSON.stringify(S);
-  S = next; if (!S.tomb) S.tomb = {};
+  S = next; if (!S.tomb) S.tomb = {}; if (!Array.isArray(S.off)) S.off = [];
   if (JSON.stringify(S) === before) return false;
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {}
   history = [];
@@ -498,6 +502,8 @@ function applyState(next){
   if (view === "study") { if (!cur) cur = pick(); render(); }
   else if (view === "list") renderList();
   else if (view === "set") renderSettings();
+  else if (view === "lessons") renderLessons();
+  renderBrand();
   return true;
 }
 
@@ -505,12 +511,23 @@ const today = () => { const d = new Date(); return d.getFullYear()+"-"+(d.getMon
 const endOfDay = () => { const d = new Date(); d.setHours(23,59,59,999); return d.getTime(); };
 function rollDay(){ const t = today(); if (S.day !== t) { S.day = t; S.newToday = 0; save(); } }
 
-// all card ids in introduction order: every jp→ru first, then ru→jp
-function activeIds(){
-  const ids = [];
-  if (S.dir !== "rj") WORDS.forEach((_, i) => ids.push(i + "-jr"));
-  if (S.dir !== "jr") WORDS.forEach((_, i) => ids.push(i + "-rj"));
+// Карточки урока в порядке появления: у слов сначала все «яп → рус», потом «рус → яп»; у канджи одна сторона
+function lessonIds(l){
+  const ids = [], n = l.items.length;
+  if (isKanji(l)) { for (let i = 0; i < n; i++) ids.push(l.id + ":" + i + "-k"); return ids; }
+  if (S.dir !== "rj") for (let i = 0; i < n; i++) ids.push(l.id + ":" + i + "-jr");
+  if (S.dir !== "jr") for (let i = 0; i < n; i++) ids.push(l.id + ":" + i + "-rj");
   return ids;
+}
+function selLessons(){
+  const on = LESSONS.filter(l => !S.off.includes(l.id));
+  return on.length ? on : LESSONS.slice(0, 1);
+}
+const activeIds = () => selLessons().flatMap(lessonIds);
+/** «l5:3-jr» → { l: урок, w: слово, dir: "jr" } */
+function cardOf(id){
+  const k = id.lastIndexOf(":"), l = LBY[id.slice(0, k)], [i, dir] = id.slice(k + 1).split("-");
+  return { l, w: l && l.items[+i], dir };
 }
 
 // Anki-like scheduler
@@ -543,8 +560,8 @@ function fmt(ms){
   return (d/365).toFixed(1).replace(".0","") + " г.";
 }
 
-function stats(){
-  const ids = activeIds(), eod = endOfDay();
+function stats(ids = activeIds()){
+  const eod = endOfDay();
   let n = 0, l = 0, r = 0;
   for (const id of ids) {
     const c = S.cards[id];
@@ -555,10 +572,10 @@ function stats(){
 function pick(){
   rollDay();
   const now = Date.now(), eod = endOfDay(), ids = activeIds();
-  const by = f => ids.filter(f).sort((a,b) => S.cards[a].due - S.cards[b].due)[0];
+  const by = f => ids.filter(id => cardOf(id).w).filter(f).sort((a,b) => S.cards[a].due - S.cards[b].due)[0];
   return by(id => S.cards[id]?.s === "l" && S.cards[id].due <= now)
       || by(id => S.cards[id]?.s === "r" && S.cards[id].due <= eod)
-      || (S.newToday < S.newPerDay ? ids.find(id => !S.cards[id]) : null)
+      || (S.newToday < S.newPerDay ? ids.find(id => !S.cards[id] && cardOf(id).w) : null)
       || by(id => S.cards[id]?.s === "l" && S.cards[id].due <= now + AHEAD)
       || null;
 }
@@ -566,6 +583,11 @@ function pick(){
 let cur = null, shown = false, history = [], waitTimer = null;
 
 function faceJP(w){ return `<div class="kana">${esc(w[0])}</div>` + (w[1] ? `<div class="kanji">${esc(w[1])}</div>` : ""); }
+function faceKanjiBack(w){
+  return `<div class="ru">${esc(w[1])}</div><div class="reads">`
+    + `<span>くんよみ · япон.</span><b>${esc(w[2] || "—")}</b>`
+    + `<span>オンヨミ · китай.</span><b>${esc(w[3] || "—")}</b></div>`;
+}
 function faceRU(w, front){ return `<div class="ru${front?" front":""}">${esc(w[2])}${w[3] ? `<span class="note">${esc(w[3])}</span>` : ""}</div>`; }
 
 function render(){
@@ -589,10 +611,11 @@ function render(){
     $("bar").innerHTML = "";
     return;
   }
-  const [i, dir] = cur.split("-"), w = WORDS[+i];
-  const label = dir === "jr" ? "日本語 → русский" : "русский → 日本語";
-  const front = dir === "jr" ? faceJP(w) : faceRU(w, true);
-  const back  = dir === "jr" ? faceRU(w) : faceJP(w);
+  const { l, w, dir } = cardOf(cur);
+  let label = dir === "k" ? "漢字 → значение и чтения" : dir === "jr" ? "日本語 → русский" : "русский → 日本語";
+  if (selLessons().length > 1) label = esc(l.title) + " · " + label;
+  const front = dir === "k" ? `<div class="kj-big">${esc(w[0])}</div>` : dir === "jr" ? faceJP(w) : faceRU(w, true);
+  const back  = dir === "k" ? faceKanjiBack(w) : dir === "jr" ? faceRU(w) : faceJP(w);
   $("stage").innerHTML = `<div class="card"><div class="dir">${label}</div>${front}${shown ? `<div class="reveal"><hr>${back}</div>` : `<div class="taphint">Нажми на карточку, чтобы увидеть ответ</div>`}</div>`;
   $("stage").classList.toggle("tap", !shown);
 
@@ -632,13 +655,15 @@ const viewHooks = [];
 function show(v){
   view = v;
   $("study").hidden = false; $("study").style.display = v === "study" ? "contents" : "none";
-  $("listView").hidden = v !== "list"; $("setView").hidden = v !== "set"; $("chatView").hidden = v !== "chat";
+  $("listView").hidden = v !== "list"; $("lessonsView").hidden = v !== "lessons";
+  $("brandBtn").setAttribute("aria-pressed", v === "lessons"); $("setView").hidden = v !== "set"; $("chatView").hidden = v !== "chat";
   $("undoBtn").hidden = v === "chat";
   $("listBtn").setAttribute("aria-pressed", v === "list"); $("setBtn").setAttribute("aria-pressed", v === "set");
   $("chatBtn").setAttribute("aria-pressed", v === "chat");
   viewHooks.forEach(f => { try { f(v); } catch(e) {} });
   if (v === "list") renderList();
   if (v === "set") renderSettings();
+  if (v === "lessons") renderLessons();
   if (v === "study") { if (!cur) cur = pick(); render(); }
 }
 function chip(id, tag){
@@ -648,17 +673,47 @@ function chip(id, tag){
   return `<span class="chip r">${tag} ${c.due <= now ? "сейчас" : fmt(c.due - now)}</span>`;
 }
 function renderList(){
-  $("listBody").innerHTML = WORDS.map((w, i) => `<tr>
-    <td><div class="k">${esc(w[0])}</div>${w[1] ? `<div class="kj">${esc(w[1])}</div>` : ""}</td>
-    <td class="r">${esc(w[2])}${w[3] ? `<br><span class="hint">${esc(w[3])}</span>` : ""}</td>
-    <td><div class="st">${chip(i+"-jr","日→")}${chip(i+"-rj","→日")}</div></td></tr>`).join("");
+  $("listBody").innerHTML = selLessons().map(l => `<h3 class="lh">${esc(l.title)}</h3>
+    <div class="tablewrap"><table class="list"><tbody>${l.items.map((w, i) => isKanji(l) ? `<tr>
+      <td><div class="kjl">${esc(w[0])}</div></td>
+      <td class="r">${esc(w[1])}<br><span class="rd">${esc(w[2] || "—")}　${esc(w[3] || "—")}</span></td>
+      <td><div class="st">${chip(l.id+":"+i+"-k","漢")}</div></td></tr>` : `<tr>
+      <td><div class="k">${esc(w[0])}</div>${w[1] ? `<div class="kj">${esc(w[1])}</div>` : ""}</td>
+      <td class="r">${esc(w[2])}${w[3] ? `<br><span class="hint">${esc(w[3])}</span>` : ""}</td>
+      <td><div class="st">${chip(l.id+":"+i+"-jr","日→")}${chip(l.id+":"+i+"-rj","→日")}</div></td></tr>`).join("")}</tbody></table></div>`).join("");
 }
+function renderBrand(){
+  const sel = selLessons();
+  $("brandTitle").textContent = sel.length === LESSONS.length && sel.length > 1 ? "Все уроки"
+    : sel.map(l => l.title).join(", ").replace(/, Урок /g, ", ");
+  $("brandJp").textContent = sel.length === 1 ? sel[0].jp || "" : "";
+}
+function renderLessons(){
+  const box = $("lessonsBody");
+  box.innerHTML = LESSONS.map(l => {
+    const st = stats(lessonIds(l)), on = !S.off.includes(l.id);
+    const n = l.items.length, what = isKanji(l) ? "канджи" : n % 10 === 1 && n % 100 !== 11 ? "слово" : [2,3,4].includes(n % 10) && ![12,13,14].includes(n % 100) ? "слова" : "слов";
+    return `<label class="lesson"><input type="checkbox" data-l="${esc(l.id)}"${on ? " checked" : ""}>
+      <span class="ln"><b>${esc(l.title)}<i>${esc(l.jp || "")}</i></b><small>${n} ${what}</small></span>
+      <span class="lc"><span class="c-new" title="Новые">${st.n}</span><span class="c-lrn" title="Изучаемые">${st.l}</span><span class="c-rev" title="На повторение">${st.r}</span></span></label>`;
+  }).join("");
+}
+$("lessonsBody").onchange = e => {
+  const id = e.target.dataset.l; if (!id) return;
+  const off = new Set(S.off);
+  if (e.target.checked) off.delete(id); else off.add(id);
+  if (off.size >= LESSONS.length) { e.target.checked = true; return; }   // хотя бы один урок
+  S.off = [...off]; S.setAt = Date.now(); save();
+  cur = null; history = []; renderBrand(); renderLessons();
+};
+$("brandBtn").onclick = () => show(view === "lessons" ? "study" : "lessons");
 function renderSettings(){
   $("dirSeg").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.dataset.dir === S.dir));
   $("newPerDay").value = S.newPerDay;
   $("resetConfirm").hidden = true; $("resetBtn").hidden = false;
   if (window.Account) Account.render();
 }
+renderBrand();
 $("dirSeg").onclick = e => { const b = e.target.closest("[data-dir]"); if (!b) return; S.dir = b.dataset.dir; S.setAt = Date.now(); save(); cur = null; renderSettings(); };
 $("newPerDay").onchange = e => { const v = Math.max(1, Math.min(200, Math.round(+e.target.value || 20))); S.newPerDay = v; S.setAt = Date.now(); e.target.value = v; save(); cur = null; };
 $("resetBtn").onclick = () => { $("resetConfirm").hidden = false; $("resetBtn").hidden = true; };
