@@ -14,7 +14,7 @@
     <ApplicationIcon>icon.ico</ApplicationIcon>
 
     <!-- Версию при релизе подставляет GitHub Actions из тега (v1.0.1 → 1.0.1) -->
-    <Version>1.1.8</Version>
+    <Version>1.1.9</Version>
 
     <!-- Репозиторий для обновлений (owner/repo). GitHub Actions подставляет его сам -->
     <UpdateRepo></UpdateRepo>

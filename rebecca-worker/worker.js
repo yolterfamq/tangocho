@@ -152,20 +152,25 @@ async function extract(req, env) {
 
   const providers = buildProviders(env, true, EXTRACT, 12000);
   if (!providers.length) return json({ error: "На сервере не задан ни один ключ ИИ", code: "badkey" }, 500);
-  let lastErr = "", lastStatus = 0;
+  let lastErr = "", lastStatus = 0, none = null;
+  const trace = [];
   for (const p of providers) {
     try {
       const r = await p.call(msgs);
-      if (!r.ok) { lastStatus = r.status; lastErr = p.name + ": " + r.status + " " + (await r.text()).slice(0, 300); continue; }
+      if (!r.ok) { lastStatus = r.status; lastErr = p.name + ": " + r.status + " " + (await r.text()).slice(0, 200); trace.push(lastErr); continue; }
       const text = await collect(r.body);
       const lesson = parseLesson(text);
-      if (lesson) return json({ ...lesson, by: p.name });
-      lastErr = p.name + ": ответ не похож на JSON — " + text.slice(0, 200);
+      if (lesson && lesson.type !== "none") return json({ ...lesson, by: p.name });
+      // Пусто — возможно, эта модель плохо видит картинку; пробуем следующую
+      lastErr = p.name + (lesson ? ": ничего не нашла" : ": непонятный ответ") + (text ? " — «" + text.replace(/\s+/g, " ").slice(0, 160) + "»" : " (пусто)");
+      if (lesson) none = lesson;
     } catch (e) {
       lastErr = p.name + ": " + (e.message || e);
     }
+    trace.push(lastErr);
   }
-  return json({ error: "Не получилось распознать страницу. " + lastErr, code: lastStatus === 429 ? "limit" : "extract" }, 502);
+  if (none) return json({ ...none, trace });
+  return json({ error: "Не получилось распознать страницу. " + trace.join(" | "), code: lastStatus === 429 ? "limit" : "extract", trace }, 502);
 }
 
 /** Ответ сервиса → поток событий {t} / {error} / {done} (уже без «мыслей») */
@@ -238,9 +243,17 @@ function parseLesson(text) {
   if (a < 0 || b <= a) return null;
   let o;
   try { o = JSON.parse(t.slice(a, b + 1)); } catch { return null; }
-  if (!o || !Array.isArray(o.items)) return null;
-  const type = o.type === "kanji" ? "kanji" : o.type === "none" ? "none" : "words";
-  const items = o.items
+  if (Array.isArray(o)) o = { items: o };
+  const list = o && (o.items || o.words || o.kanji || o.cards);
+  if (!o || !Array.isArray(list)) return null;
+  const type = o.type === "kanji" || (!o.type && o.kanji) ? "kanji" : o.type === "none" ? "none" : "words";
+  // Модели иногда присылают объекты вместо массивов — берём поля по смыслу
+  const pick = (x, names) => { for (const n of names) if (x[n] != null && x[n] !== "") return x[n]; return ""; };
+  const row = x => Array.isArray(x) ? x : x && typeof x === "object" ? (type === "kanji"
+    ? [pick(x, ["kanji", "char", "иероглиф"]), pick(x, ["meaning", "ru", "translation", "значение"]), pick(x, ["kun", "kunyomi", "くんよみ"]), pick(x, ["on", "onyomi", "オンヨミ"])]
+    : [pick(x, ["kana", "reading", "hiragana", "кана"]), pick(x, ["kanji", "кандзи"]), pick(x, ["ru", "translation", "meaning", "перевод"]), pick(x, ["note", "comment", "пояснение"])]) : null;
+  const items = list
+    .map(row)
     .filter(x => Array.isArray(x) && x.length)
     .map(x => [0, 1, 2, 3].map(k => String(x[k] == null ? "" : x[k]).replace(/\*/g, "").trim()))
     .filter(x => x[0] || x[2])

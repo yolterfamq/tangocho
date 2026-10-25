@@ -202,7 +202,10 @@
       if (d === draft) render();
       try {
         const res = await extract(await shrink(files[i]), draft.type);
-        if (res.type === "none" || !res.items || !res.items.length) { draft.errs.push(name + ": не нашла на ней слов или канджи."); continue; }
+        if (res.type === "none" || !res.items || !res.items.length) {
+          draft.errs.push(name + ": не нашла на ней слов или канджи." + (res.trace && res.trace.length ? " Подробности: " + res.trace.join(" | ") : ""));
+          continue;
+        }
         // Канджи в новом уроке → дописываем в общий набор «Канджи», как договорились
         if (!draft.id && !draft.type && res.type === "kanji") {
           const kl = LESSONS.find(isKanji);
