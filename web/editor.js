@@ -7,7 +7,7 @@
   const drafts = {};                 // id урока (или "new") → черновик
   let d = null;                      // открытый черновик
 
-  const WORDS_PH = ["かな", "漢字 — если есть в учебнике", "перевод", "пояснение (необязательно)"];
+  const WORDS_PH = ["かな", "漢字", "перевод", "пояснение (необязательно)"];
   const KANJI_PH = ["漢", "значение", "くんよみ", "オンヨミ"];
   const FW = "０１２３４５６７８９";
   const jpTitle = t => { const m = /^Урок\s*(\d+)\s*$/i.exec(t || ""); return m ? "だい" + m[1].replace(/\d/g, c => FW[+c]) + "か" : ""; };
@@ -185,6 +185,7 @@
     });
     let j = {};
     try { j = await r.json(); } catch (e) {}
+    if (r.status === 404) throw new Error("на сервере Ребеки старая версия. Вставь новый rebecca-worker/worker.js в Cloudflare (Edit code → Deploy).");
     if (!r.ok) throw new Error(ERR[j.code] || j.error || ("сервер ответил " + r.status));
     return j;
   }

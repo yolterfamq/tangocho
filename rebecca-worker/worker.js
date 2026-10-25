@@ -110,27 +110,10 @@ export default {
     const providers = buildProviders(env, hasImages);
     if (!providers.length) return json({ error: "На сервере не задан ни один ключ ИИ (GROQ_API_KEY, GEMINI_API_KEY или привязка AI)", code: "badkey" }, 500);
 
-    let stream = null, lastErr = "", lastStatus = 0;
-    for (const p of providers) {
-      try {
-        const r = await p.call(msgs);
-        if (r.ok) { stream = r.body; break; }
-        lastStatus = r.status;
-        lastErr = p.name + ": " + r.status + " " + (await r.text()).slice(0, 300);
-      } catch (e) {
-        lastErr = p.name + ": " + (e.message || e);
-      }
-    }
-    if (!stream) {
-      const code = lastStatus === 429 ? "limit"
-        : lastStatus === 401 || lastStatus === 403 ? "badkey"
-        : /credit balance|insufficient|balance/i.test(lastErr) || lastStatus === 402 ? "billing" : "claude";
-      return json({ error: "Все ИИ сейчас недоступны. Последняя ошибка — " + lastErr, code }, 502);
-    }
-
-    // 4) Пересылаем ответ по кусочкам: data: {"t":"текст"}
+    // 4) Пересылаем ответ по кусочкам: data: {"t":"текст"}.
+    //    Если сервис ответил пусто или с ошибкой до первого слова — молча берём следующий.
     const { readable, writable } = new TransformStream();
-    ctx.waitUntil(pipe(stream, writable));
+    ctx.waitUntil(streamChain(providers, msgs, writable));
     return new Response(readable, {
       headers: { ...CORS, "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache" },
     });
@@ -185,26 +168,68 @@ async function extract(req, env) {
   return json({ error: "Не получилось распознать страницу. " + lastErr, code: lastStatus === 429 ? "limit" : "extract" }, 502);
 }
 
-/** Собираем потоковый ответ в одну строку (с теми же фильтрами, что и в чате) */
-async function collect(stream) {
+/** Ответ сервиса → поток событий {t} / {error} / {done} (уже без «мыслей») */
+async function* events(stream) {
   const { readable, writable } = new TransformStream();
   const done = pipe(stream, writable);
   const reader = readable.getReader(), dec = new TextDecoder();
-  let buf = "", text = "", err = "";
-  for (;;) {
-    const { value, done: end } = await reader.read();
-    if (end) break;
-    buf += dec.decode(value, { stream: true });
-    let i;
-    while ((i = buf.indexOf("\n\n")) >= 0) {
-      const line = buf.slice(0, i).trim(); buf = buf.slice(i + 2);
-      if (!line.startsWith("data:")) continue;
-      try { const ev = JSON.parse(line.slice(5)); if (ev.t) text += ev.t; if (ev.error) err = ev.error; } catch {}
+  let buf = "";
+  try {
+    for (;;) {
+      const { value, done: end } = await reader.read();
+      if (end) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf("\n\n")) >= 0) {
+        const line = buf.slice(0, i).trim(); buf = buf.slice(i + 2);
+        if (!line.startsWith("data:")) continue;
+        try { yield JSON.parse(line.slice(5)); } catch {}
+      }
     }
+  } finally {
+    try { reader.cancel(); } catch {}
+    await done.catch(() => {});
   }
-  await done;
+}
+
+/** Собираем потоковый ответ в одну строку */
+async function collect(stream) {
+  let text = "", err = "";
+  for await (const ev of events(stream)) { if (ev.t) text += ev.t; if (ev.error) err = ev.error; }
   if (!text && err) throw new Error(err);
   return text;
+}
+
+/** Чат: пробуем сервисы по очереди, пока какой-нибудь не начнёт отвечать текстом */
+async function streamChain(providers, msgs, writable) {
+  const w = writable.getWriter(), enc = new TextEncoder();
+  const out = obj => w.write(enc.encode("data: " + JSON.stringify(obj) + "\n\n"));
+  let lastErr = "", lastStatus = 0;
+  try {
+    for (const p of providers) {
+      let got = false;
+      try {
+        const r = await p.call(msgs);
+        if (!r.ok) { lastStatus = r.status; lastErr = p.name + ": " + r.status + " " + (await r.text()).slice(0, 300); continue; }
+        let err = "";
+        for await (const ev of events(r.body)) {
+          if (ev.t) { got = true; await out({ t: ev.t }); }
+          else if (ev.error) { if (got) { await out(ev); return; } err = ev.error; break; }
+        }
+        if (got) { await out({ done: true }); return; }
+        lastErr = p.name + ": " + (err || "пустой ответ");
+      } catch (e) {
+        if (got) { await out({ error: "Связь с ИИ оборвалась: " + (e.message || e) }); return; }
+        lastErr = p.name + ": " + (e.message || e);
+      }
+    }
+    const code = lastStatus === 429 ? "limit"
+      : lastStatus === 401 || lastStatus === 403 ? "badkey"
+      : /credit balance|insufficient|balance/i.test(lastErr) || lastStatus === 402 ? "billing" : "claude";
+    await out({ error: "Все ИИ сейчас недоступны. Последняя ошибка — " + lastErr, code });
+  } finally {
+    try { await w.close(); } catch {}
+  }
 }
 
 function parseLesson(text) {
@@ -259,7 +284,9 @@ function buildProviders(env, hasImages, system = SYSTEM, maxTokens = 12000) {
     const url = "https://api.groq.com/openai/v1/chat/completions";
     // У Groq бесплатно ~6–8 тыс. токенов в минуту на модель, и лимит ответа туда засчитывается — поэтому потолок ниже
     const qwen = openaiCall("groq-qwen", url, groq, env.GROQ_VISION_MODEL || "qwen/qwen3.8-27b", { reasoning_format: "hidden" }, 5000);
-    if (hasImages) list.push(qwen);
+    // Без «размышлений»: иначе модель тратит весь лимит на мысли и отвечает пусто
+    const qwenFast = openaiCall("groq-qwen-fast", url, groq, env.GROQ_VISION_MODEL || "qwen/qwen3.8-27b", { reasoning_effort: "none" }, 5000);
+    if (hasImages) { list.push(qwenFast); list.push(qwen); }
     else {
       list.push(openaiCall("groq-gptoss", url, groq, env.GROQ_TEXT_MODEL || "openai/gpt-oss-120b", {}, 6500));
       list.push(qwen);
