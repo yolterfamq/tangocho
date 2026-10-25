@@ -69,6 +69,13 @@
     });
   }
 
+  /** Подписаться заново (например, после публикации новых правил в Firebase) */
+  CL.retry = () => { uid = null; watch(); };
+  // Вернулись в приложение, а доступа не было — пробуем ещё раз
+  const again = () => { if (CL.denied && document.visibilityState === "visible") CL.retry(); };
+  window.addEventListener("focus", again);
+  document.addEventListener("visibilitychange", again);
+
   function need() {
     const A = window.Account;
     if (!A || !A.configured) throw new Error("Аккаунты не настроены");

@@ -51,7 +51,9 @@
     if (!A.ready) return "Загрузка аккаунта…";
     if (!A.user) return `Чтобы добавлять и менять уроки, войди в аккаунт. <button class="btn sm" data-act="settings">Открыть настройки</button>`;
     if (!A.user.emailVerified) return "Подтверди почту — письмо пришло при регистрации. Потом нажми «Я подтвердил(а)» в настройках.";
-    if (CL && CL.denied) return "Общие уроки доступны только нам двоим. Этот аккаунт не в списке, или не опубликованы новые правила базы.";
+    if (CL && CL.denied) return `База не пускает к общим урокам аккаунт <b>${esc(A.user.email || "")}</b>.<br>
+      Если это одна из наших двух почт — значит, в Firebase ещё не опубликованы новые правила: Firestore Database → Rules → вставить firestore.rules → Publish.
+      <button class="btn sm" data-act="retry">Проверить снова</button>`;
     return "";
   }
 
@@ -139,6 +141,7 @@
     switch (b.dataset.act) {
       case "back": show("lessons"); break;
       case "settings": show("set"); break;
+      case "retry": if (window.CloudLessons) CloudLessons.retry(); break;
       case "photos": view.querySelector("#edFile").click(); break;
       case "addrow":
         d.rows.push({ key: null, w: ["", "", "", ""], fresh: true }); d.dirty = true; render();

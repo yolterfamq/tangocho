@@ -15,6 +15,12 @@
 const SYSTEM = `Ты — Ребека, дружелюбный и терпеливый репетитор внутри приложения «Тангочо» (японские карточки).
 Отвечай на языке пользователя, по умолчанию по-русски. Обращайся на «ты».
 
+Главное правило: выполняй просьбу ПОЛНОСТЬЮ и именно в том виде, как просят.
+- Если в сообщении несколько вопросов или заданий — ответь на каждый, по порядку, с номерами. Ничего не пропускай и не заменяй на «и так далее».
+- Если просят формат (таблицу, список, только ответ, перевод, определённое количество примеров, язык) — соблюдай его.
+- Не отказывайся от учебных задач и не отвечай «попробуй сам», если об этом не просили.
+- Если задание длинное — всё равно доведи до конца.
+
 Что ты делаешь:
 - Отвечаешь на любые учебные вопросы: математика, физика, химия, языки, история, программирование, японский и др.
 - Решаешь задачи по шагам: сначала кратко, что дано и что нужно найти, потом решение с пояснением каждого шага, в конце — чёткий ответ.
@@ -24,7 +30,7 @@ const SYSTEM = `Ты — Ребека, дружелюбный и терпели�
 - По японскому: давай чтение хираганой рядом с кандзи, перевод и короткие примеры.
 - Как репетитор: объясняй понятно, приводи примеры; если ученик хочет разобраться сам — давай подсказки, а не готовый ответ.
 
-Оформление: Markdown. Формулы — LaTeX: в строке $...$, отдельной строкой $$...$$. Не растягивай ответ без нужды.
+Оформление: Markdown. Формулы — LaTeX: в строке $...$, отдельной строкой $$...$$. Пиши по делу, без воды, но не урезай то, что попросили.
 Если не уверена в ответе — так и скажи.`;
 
 // Распознавание страниц учебника → карточки (кнопка «Добавить урок» в приложении)
@@ -161,7 +167,7 @@ async function extract(req, env) {
     { type: "text", text: "Распознай эту страницу и верни JSON." + hint },
   ] }];
 
-  const providers = buildProviders(env, true, EXTRACT, 8192);
+  const providers = buildProviders(env, true, EXTRACT, 12000);
   if (!providers.length) return json({ error: "На сервере не задан ни один ключ ИИ", code: "badkey" }, 500);
   let lastErr = "", lastStatus = 0;
   for (const p of providers) {
@@ -218,14 +224,15 @@ function parseLesson(text) {
 }
 
 /** Список сервисов по порядку. Каждый возвращает Response с потоком SSE. */
-function buildProviders(env, hasImages, system = SYSTEM, maxTokens = 4096) {
+// Бесплатные модели «думают» внутри лимита токенов — с маленьким лимитом длинные ответы обрывались
+function buildProviders(env, hasImages, system = SYSTEM, maxTokens = 12000) {
   const list = [];
-  const openaiCall = (name, url, key, model, extra = {}) => ({
+  const openaiCall = (name, url, key, model, extra = {}, cap = maxTokens) => ({
     name,
     call: msgs => fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
-      body: JSON.stringify({ model, stream: true, max_tokens: maxTokens, messages: toOpenAI(msgs, system), ...extra }),
+      body: JSON.stringify({ model, stream: true, max_tokens: Math.min(maxTokens, cap), messages: toOpenAI(msgs, system), ...extra }),
     }),
   });
 
@@ -250,10 +257,11 @@ function buildProviders(env, hasImages, system = SYSTEM, maxTokens = 4096) {
   const groq = (env.GROQ_API_KEY || "").trim();
   if (groq) {
     const url = "https://api.groq.com/openai/v1/chat/completions";
-    const qwen = openaiCall("groq-qwen", url, groq, env.GROQ_VISION_MODEL || "qwen/qwen3.8-27b", { reasoning_format: "hidden" });
+    // У Groq бесплатно ~6–8 тыс. токенов в минуту на модель, и лимит ответа туда засчитывается — поэтому потолок ниже
+    const qwen = openaiCall("groq-qwen", url, groq, env.GROQ_VISION_MODEL || "qwen/qwen3.8-27b", { reasoning_format: "hidden" }, 5000);
     if (hasImages) list.push(qwen);
     else {
-      list.push(openaiCall("groq-gptoss", url, groq, env.GROQ_TEXT_MODEL || "openai/gpt-oss-120b"));
+      list.push(openaiCall("groq-gptoss", url, groq, env.GROQ_TEXT_MODEL || "openai/gpt-oss-120b", {}, 6500));
       list.push(qwen);
     }
   }
@@ -271,7 +279,7 @@ function buildProviders(env, hasImages, system = SYSTEM, maxTokens = 4096) {
     list.push({
       name: "workers-ai",
       call: async msgs => {
-        const out = await env.AI.run(env.WORKERS_AI_MODEL || "@cf/qwen/qwen3.8-27b", { messages: toOpenAI(msgs, system), stream: true, max_tokens: maxTokens });
+        const out = await env.AI.run(env.WORKERS_AI_MODEL || "@cf/qwen/qwen3.8-27b", { messages: toOpenAI(msgs, system), stream: true, max_tokens: Math.min(maxTokens, 8192) });
         return new Response(out, { status: 200 });
       },
     });
