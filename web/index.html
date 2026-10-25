@@ -79,7 +79,10 @@ hr{border:0;border-top:1px solid var(--line);margin:22px 0}
 .reads b{font-family:var(--jp);font-weight:600;font-size:clamp(20px,5.5vw,24px);overflow-wrap:anywhere}
 /* lessons */
 .lessons{display:flex;flex-direction:column;gap:8px;margin-top:12px}
-.lesson{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);cursor:pointer}
+.lesson{display:flex;align-items:center;gap:4px;padding:4px 4px 4px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.lsel{display:flex;align-items:center;gap:12px;flex:1;min-width:0;padding-block:8px;cursor:pointer}
+.ledit{color:var(--muted);flex:none}
+.addl{margin-top:14px;align-self:stretch;width:100%}
 .lesson input{width:20px;height:20px;accent-color:var(--accent);flex:none}
 .lesson .ln{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .lesson .ln b{font-weight:600}
@@ -367,7 +370,12 @@ body{margin:0;user-select:none;-webkit-user-select:none}
     <h2>Уроки</h2>
     <p class="hint">Отметь, что учить. Можно один урок или несколько сразу — карточки отмеченных уроков идут вперемешку по расписанию.</p>
     <div class="lessons" id="lessonsBody"></div>
+    <button class="btn primary addl" id="addLessonBtn">＋ Добавить урок по фото</button>
+    <p class="hint">Сфоткай или сделай скриншот страниц «Новые слова» или канджи — Ребека сама составит карточки, а ты проверишь.</p>
   </section>
+
+  <!-- редактор урока (editor.js) -->
+  <section class="sheet" id="editView" hidden></section>
 
   <!-- list -->
   <section class="sheet" id="listView" hidden>
@@ -430,8 +438,22 @@ body{margin:0;user-select:none;-webkit-user-select:none}
 
 
 const LESSONS = window.LESSONS || [];
-const LBY = Object.fromEntries(LESSONS.map(l => [l.id, l]));
+const LBY = {};
 const isKanji = l => l && l.type === "kanji";
+// У слов есть «ключ»: у встроенных уроков это номер, у добавленных/исправленных — свой (n1, n2…),
+// чтобы прогресс не съезжал, если слово удалили из середины
+const keyOf = (l, i) => l.keys ? l.keys[i] : String(i);
+function idxOf(l, key){
+  if (!l) return -1;
+  if (!l.keys) return +key;
+  if (!l._idx) l._idx = Object.fromEntries(l.keys.map((k, i) => [k, i]));
+  return key in l._idx ? l._idx[key] : -1;
+}
+const orderOf = l => l.order != null ? l.order : isKanji(l) ? 1000 : (+((l.title || "").match(/\d+/) || [])[0] || 500);
+LESSONS.forEach(l => { l.builtin = true; });
+const BUILTIN = LESSONS.slice();       // уроки из файлов; облако может их поправить или добавить новые
+LESSONS.sort((a, b) => orderOf(a) - orderOf(b));
+LESSONS.forEach(l => { LBY[l.id] = l; });
 
 // Имя ключа осталось с первой версии (тогда был только урок 4) — не менять, иначе потеряется прогресс
 const KEY = "tango-l4-v1", MIN = 60000, DAY = 86400000, AHEAD = 20 * MIN;
@@ -514,9 +536,9 @@ function rollDay(){ const t = today(); if (S.day !== t) { S.day = t; S.newToday 
 // Карточки урока в порядке появления: у слов сначала все «яп → рус», потом «рус → яп»; у канджи одна сторона
 function lessonIds(l){
   const ids = [], n = l.items.length;
-  if (isKanji(l)) { for (let i = 0; i < n; i++) ids.push(l.id + ":" + i + "-k"); return ids; }
-  if (S.dir !== "rj") for (let i = 0; i < n; i++) ids.push(l.id + ":" + i + "-jr");
-  if (S.dir !== "jr") for (let i = 0; i < n; i++) ids.push(l.id + ":" + i + "-rj");
+  if (isKanji(l)) { for (let i = 0; i < n; i++) ids.push(l.id + ":" + keyOf(l, i) + "-k"); return ids; }
+  if (S.dir !== "rj") for (let i = 0; i < n; i++) ids.push(l.id + ":" + keyOf(l, i) + "-jr");
+  if (S.dir !== "jr") for (let i = 0; i < n; i++) ids.push(l.id + ":" + keyOf(l, i) + "-rj");
   return ids;
 }
 function selLessons(){
@@ -526,8 +548,21 @@ function selLessons(){
 const activeIds = () => selLessons().flatMap(lessonIds);
 /** «l5:3-jr» → { l: урок, w: слово, dir: "jr" } */
 function cardOf(id){
-  const k = id.lastIndexOf(":"), l = LBY[id.slice(0, k)], [i, dir] = id.slice(k + 1).split("-");
-  return { l, w: l && l.items[+i], dir };
+  const k = id.lastIndexOf(":"), l = LBY[id.slice(0, k)], [key, dir] = id.slice(k + 1).split("-");
+  const i = idxOf(l, key);
+  return { l, w: l && i >= 0 ? l.items[i] : undefined, dir };
+}
+/** Новый список уроков (пришли из облака): обновляем всё, что на экране */
+function setLessons(list){
+  LESSONS.splice(0, LESSONS.length, ...list);
+  LESSONS.sort((a, b) => orderOf(a) - orderOf(b));
+  for (const k of Object.keys(LBY)) delete LBY[k];
+  LESSONS.forEach(l => { LBY[l.id] = l; });
+  if (cur && (!cardOf(cur).w || !activeIds().includes(cur))) { cur = null; shown = false; history = []; }
+  renderBrand();
+  if (view === "study") { if (!cur) cur = pick(); render(); }
+  else if (view === "list") renderList();
+  else if (view === "lessons") renderLessons();
 }
 
 // Anki-like scheduler
@@ -655,8 +690,8 @@ const viewHooks = [];
 function show(v){
   view = v;
   $("study").hidden = false; $("study").style.display = v === "study" ? "contents" : "none";
-  $("listView").hidden = v !== "list"; $("lessonsView").hidden = v !== "lessons";
-  $("brandBtn").setAttribute("aria-pressed", v === "lessons"); $("setView").hidden = v !== "set"; $("chatView").hidden = v !== "chat";
+  $("listView").hidden = v !== "list"; $("lessonsView").hidden = v !== "lessons"; $("editView").hidden = v !== "edit";
+  $("brandBtn").setAttribute("aria-pressed", v === "lessons" || v === "edit"); $("setView").hidden = v !== "set"; $("chatView").hidden = v !== "chat";
   $("undoBtn").hidden = v === "chat";
   $("listBtn").setAttribute("aria-pressed", v === "list"); $("setBtn").setAttribute("aria-pressed", v === "set");
   $("chatBtn").setAttribute("aria-pressed", v === "chat");
@@ -677,10 +712,10 @@ function renderList(){
     <div class="tablewrap"><table class="list"><tbody>${l.items.map((w, i) => isKanji(l) ? `<tr>
       <td><div class="kjl">${esc(w[0])}</div></td>
       <td class="r">${esc(w[1])}<br><span class="rd">${esc(w[2] || "—")}　${esc(w[3] || "—")}</span></td>
-      <td><div class="st">${chip(l.id+":"+i+"-k","漢")}</div></td></tr>` : `<tr>
+      <td><div class="st">${chip(l.id+":"+keyOf(l,i)+"-k","漢")}</div></td></tr>` : `<tr>
       <td><div class="k">${esc(w[0])}</div>${w[1] ? `<div class="kj">${esc(w[1])}</div>` : ""}</td>
       <td class="r">${esc(w[2])}${w[3] ? `<br><span class="hint">${esc(w[3])}</span>` : ""}</td>
-      <td><div class="st">${chip(l.id+":"+i+"-jr","日→")}${chip(l.id+":"+i+"-rj","→日")}</div></td></tr>`).join("")}</tbody></table></div>`).join("");
+      <td><div class="st">${chip(l.id+":"+keyOf(l,i)+"-jr","日→")}${chip(l.id+":"+keyOf(l,i)+"-rj","→日")}</div></td></tr>`).join("")}</tbody></table></div>`).join("");
 }
 function renderBrand(){
   const sel = selLessons();
@@ -693,11 +728,20 @@ function renderLessons(){
   box.innerHTML = LESSONS.map(l => {
     const st = stats(lessonIds(l)), on = !S.off.includes(l.id);
     const n = l.items.length, what = isKanji(l) ? "канджи" : n % 10 === 1 && n % 100 !== 11 ? "слово" : [2,3,4].includes(n % 10) && ![12,13,14].includes(n % 100) ? "слова" : "слов";
-    return `<label class="lesson"><input type="checkbox" data-l="${esc(l.id)}"${on ? " checked" : ""}>
+    return `<div class="lesson"><label class="lsel"><input type="checkbox" data-l="${esc(l.id)}"${on ? " checked" : ""}>
       <span class="ln"><b>${esc(l.title)}<i>${esc(l.jp || "")}</i></b><small>${n} ${what}</small></span>
-      <span class="lc"><span class="c-new" title="Новые">${st.n}</span><span class="c-lrn" title="Изучаемые">${st.l}</span><span class="c-rev" title="На повторение">${st.r}</span></span></label>`;
+      <span class="lc"><span class="c-new" title="Новые">${st.n}</span><span class="c-lrn" title="Изучаемые">${st.l}</span><span class="c-rev" title="На повторение">${st.r}</span></span></label>
+      <button class="icon ledit" data-edit="${esc(l.id)}" aria-label="Изменить ${esc(l.title)}" title="Изменить или дописать фото">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button></div>`;
   }).join("");
+  const d = window.Editor && Editor.draftFor(null);
+  $("addLessonBtn").textContent = d ? "Продолжить новый урок" + (d.title ? " «" + d.title + "»" : "") : "＋ Добавить урок по фото";
 }
+$("lessonsBody").onclick = e => {
+  const b = e.target.closest("[data-edit]");
+  if (b && window.Editor) Editor.open(b.dataset.edit);
+};
+$("addLessonBtn").onclick = () => { if (window.Editor) Editor.open(null); };
 $("lessonsBody").onchange = e => {
   const id = e.target.dataset.l; if (!id) return;
   const off = new Set(S.off);
@@ -822,6 +866,7 @@ window.__host = onHost;
 // Кнопка «Назад» на Android: сначала закрываем список/настройки
 window.__hostBack = () => {
   if (view === "chat" && window.Rebecca && Rebecca.back()) return true;
+  if (view === "edit") { show("lessons"); return true; }   // черновик не теряется
   if (view !== "study") { show("study"); return true; }
   return false;
 };
@@ -852,6 +897,8 @@ show("study");
 <script src="config.js"></script>
 <script src="account.js"></script>
 <script src="rebecca.js"></script>
+<script src="lessons-cloud.js"></script>
+<script src="editor.js"></script>
 
 </body>
 </html>

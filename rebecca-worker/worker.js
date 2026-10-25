@@ -27,6 +27,29 @@ const SYSTEM = `Ты — Ребека, дружелюбный и терпели�
 Оформление: Markdown. Формулы — LaTeX: в строке $...$, отдельной строкой $$...$$. Не растягивай ответ без нужды.
 Если не уверена в ответе — так и скажи.`;
 
+// Распознавание страниц учебника → карточки (кнопка «Добавить урок» в приложении)
+const EXTRACT = `Ты распознаёшь страницу японского учебника (русское издание) и превращаешь её в карточки.
+Ответ — ТОЛЬКО JSON, без пояснений и без \`\`\`.
+
+Формат: {"type":"words","title":"Урок 6","items":[...]}
+
+1) Если на странице список новых слов (колонки: кана, кандзи, перевод) — type "words", элемент: [кана, кандзи, перевод, пояснение]
+- кана — ровно как в первой колонке (хирагана или катакана), без звёздочек *.
+- кандзи — ТОЛЬКО если оно напечатано во второй колонке, иначе "". Ничего не добавляй от себя.
+- перевод — ровно как в учебнике, по-русски.
+- пояснение — уточнение из учебника, относящееся к слову (текст в скобках после перевода, «в ответ на…», сноска), иначе "".
+- Тире-заготовки «– ねん / – 年» пиши через ～: "～ねん", "～年".
+- Слова, где над кандзи мелко написана фуригана (разделы 会話, 練習): кана = фуригана, кандзи = само слово.
+- Бери ВСЕ слова и выражения страницы по порядку, включая имена собственные и фразы.
+
+2) Если на странице таблицы иероглифов (漢字 / いみ / くんよみ / オンヨミ) — type "kanji", элемент: [иероглиф, значение по-русски, くんよみ, オンヨミ]
+- くんよみ хираганой, как в таблице: окончание через «-» (い-きる), варианты через «／», разные чтения через « · », скобки сохраняй. Нет — "".
+- オンヨミ катаканой по тем же правилам.
+- Примеры слов внизу клетки, число черт и порядок черт НЕ нужны.
+
+title — заголовок «Урок N», если он виден на странице, иначе "".
+Если на картинке нет ни слов, ни иероглифов — {"type":"none","title":"","items":[]}.`;
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -42,20 +65,12 @@ export default {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
     const url = new URL(req.url);
     if (url.pathname === "/" && req.method === "GET") return json({ ok: true, name: "Rebecca" });
-    if (url.pathname !== "/chat" || req.method !== "POST") return json({ error: "Not found" }, 404);
+    if (!["/chat", "/extract"].includes(url.pathname) || req.method !== "POST") return json({ error: "Not found" }, 404);
 
     // 1) Кто пишет
-    let user;
-    try {
-      const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-      user = await verifyFirebaseToken(token, env.FIREBASE_PROJECT_ID || "tangocho-7cc8d");
-    } catch (e) {
-      return json({ error: "Нужно войти в аккаунт", code: "unauthorized" }, 401);
-    }
-    const allowed = (env.ALLOWED_EMAILS || "").toLowerCase().split(/[\s,;]+/).filter(Boolean);
-    const email = (user.email || "").toLowerCase();
-    if (!email || !allowed.includes(email)) return json({ error: "Нет доступа", code: "denied" }, 403);
-    if (!user.email_verified) return json({ error: "Почта не подтверждена", code: "unverified" }, 403);
+    const denied = await checkUser(req, env);
+    if (denied) return denied;
+    if (url.pathname === "/extract") return extract(req, env);
 
     // 2) Что пишет
     let body;
@@ -116,15 +131,101 @@ export default {
   },
 };
 
+/** null — можно; иначе готовый ответ с ошибкой */
+async function checkUser(req, env) {
+  let user;
+  try {
+    const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    user = await verifyFirebaseToken(token, env.FIREBASE_PROJECT_ID || "tangocho-7cc8d");
+  } catch (e) {
+    return json({ error: "Нужно войти в аккаунт", code: "unauthorized" }, 401);
+  }
+  const allowed = (env.ALLOWED_EMAILS || "").toLowerCase().split(/[\s,;]+/).filter(Boolean);
+  const email = (user.email || "").toLowerCase();
+  if (!email || !allowed.includes(email)) return json({ error: "Нет доступа", code: "denied" }, 403);
+  if (!user.email_verified) return json({ error: "Почта не подтверждена", code: "unverified" }, 403);
+  return null;
+}
+
+/** Одна страница учебника → { type: "words"|"kanji"|"none", title, items } */
+async function extract(req, env) {
+  let body;
+  try { body = await req.json(); } catch { return json({ error: "Плохой запрос" }, 400); }
+  const img = body.image || {};
+  if (!/^image\/(jpeg|png|webp)$/.test(img.mime || "") || !img.data) return json({ error: "Нужна картинка" }, 400);
+  if (img.data.length > 8_000_000) return json({ error: "Слишком большое фото", code: "too_big" }, 413);
+  const hint = body.hint === "kanji" ? "\nЭто страница с иероглифами (type \"kanji\")."
+    : body.hint === "words" ? "\nЭто страница со словами (type \"words\")." : "";
+  const msgs = [{ role: "user", content: [
+    { type: "image", source: { type: "base64", media_type: img.mime, data: img.data } },
+    { type: "text", text: "Распознай эту страницу и верни JSON." + hint },
+  ] }];
+
+  const providers = buildProviders(env, true, EXTRACT, 8192);
+  if (!providers.length) return json({ error: "На сервере не задан ни один ключ ИИ", code: "badkey" }, 500);
+  let lastErr = "", lastStatus = 0;
+  for (const p of providers) {
+    try {
+      const r = await p.call(msgs);
+      if (!r.ok) { lastStatus = r.status; lastErr = p.name + ": " + r.status + " " + (await r.text()).slice(0, 300); continue; }
+      const text = await collect(r.body);
+      const lesson = parseLesson(text);
+      if (lesson) return json({ ...lesson, by: p.name });
+      lastErr = p.name + ": ответ не похож на JSON — " + text.slice(0, 200);
+    } catch (e) {
+      lastErr = p.name + ": " + (e.message || e);
+    }
+  }
+  return json({ error: "Не получилось распознать страницу. " + lastErr, code: lastStatus === 429 ? "limit" : "extract" }, 502);
+}
+
+/** Собираем потоковый ответ в одну строку (с теми же фильтрами, что и в чате) */
+async function collect(stream) {
+  const { readable, writable } = new TransformStream();
+  const done = pipe(stream, writable);
+  const reader = readable.getReader(), dec = new TextDecoder();
+  let buf = "", text = "", err = "";
+  for (;;) {
+    const { value, done: end } = await reader.read();
+    if (end) break;
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf("\n\n")) >= 0) {
+      const line = buf.slice(0, i).trim(); buf = buf.slice(i + 2);
+      if (!line.startsWith("data:")) continue;
+      try { const ev = JSON.parse(line.slice(5)); if (ev.t) text += ev.t; if (ev.error) err = ev.error; } catch {}
+    }
+  }
+  await done;
+  if (!text && err) throw new Error(err);
+  return text;
+}
+
+function parseLesson(text) {
+  let t = String(text || "").replace(/```(?:json)?/gi, "");
+  const a = t.indexOf("{"), b = t.lastIndexOf("}");
+  if (a < 0 || b <= a) return null;
+  let o;
+  try { o = JSON.parse(t.slice(a, b + 1)); } catch { return null; }
+  if (!o || !Array.isArray(o.items)) return null;
+  const type = o.type === "kanji" ? "kanji" : o.type === "none" ? "none" : "words";
+  const items = o.items
+    .filter(x => Array.isArray(x) && x.length)
+    .map(x => [0, 1, 2, 3].map(k => String(x[k] == null ? "" : x[k]).replace(/\*/g, "").trim()))
+    .filter(x => x[0] || x[2])
+    .slice(0, 300);
+  return { type: items.length ? type : "none", title: String(o.title || "").trim().slice(0, 60), items };
+}
+
 /** Список сервисов по порядку. Каждый возвращает Response с потоком SSE. */
-function buildProviders(env, hasImages) {
+function buildProviders(env, hasImages, system = SYSTEM, maxTokens = 4096) {
   const list = [];
   const openaiCall = (name, url, key, model, extra = {}) => ({
     name,
     call: msgs => fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
-      body: JSON.stringify({ model, stream: true, max_tokens: 4096, messages: toOpenAI(msgs), ...extra }),
+      body: JSON.stringify({ model, stream: true, max_tokens: maxTokens, messages: toOpenAI(msgs, system), ...extra }),
     }),
   });
 
@@ -139,7 +240,7 @@ function buildProviders(env, hasImages) {
         call: msgs => fetch(base + "/v1/messages", {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-api-key": customKey, "anthropic-version": "2023-06-01" },
-          body: JSON.stringify({ model, max_tokens: 8192, system: SYSTEM, messages: msgs, stream: true }),
+          body: JSON.stringify({ model, max_tokens: Math.max(8192, maxTokens), system, messages: msgs, stream: true }),
         }),
       });
     }
@@ -170,7 +271,7 @@ function buildProviders(env, hasImages) {
     list.push({
       name: "workers-ai",
       call: async msgs => {
-        const out = await env.AI.run(env.WORKERS_AI_MODEL || "@cf/qwen/qwen3.8-27b", { messages: toOpenAI(msgs), stream: true, max_tokens: 4096 });
+        const out = await env.AI.run(env.WORKERS_AI_MODEL || "@cf/qwen/qwen3.8-27b", { messages: toOpenAI(msgs, system), stream: true, max_tokens: maxTokens });
         return new Response(out, { status: 200 });
       },
     });
@@ -179,8 +280,8 @@ function buildProviders(env, hasImages) {
 }
 
 /** Сообщения из формата Claude в формат OpenAI (картинки — data:URL) */
-function toOpenAI(msgs) {
-  const out = [{ role: "system", content: SYSTEM }];
+function toOpenAI(msgs, system = SYSTEM) {
+  const out = [{ role: "system", content: system }];
   for (const m of msgs) {
     const hasImg = m.content.some(c => c.type === "image");
     if (!hasImg) { out.push({ role: m.role, content: m.content.map(c => c.text).join("\n\n") }); continue; }

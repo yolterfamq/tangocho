@@ -8,5 +8,15 @@ service cloud.firestore {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
     }
+
+    // Общие уроки (добавленные по фото) — только для нас двоих
+    function isUs() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in ['lin4ik.04.04@gmail.com', 'danellololmarat@gmail.com'];
+    }
+    match /lessons/{lessonId} {
+      allow read, write: if isUs();
+    }
   }
 }
